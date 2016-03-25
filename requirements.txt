@@ -8,9 +8,14 @@ snakemake>=3.4.2
 
 # Packages specific to your pipeline
 ipython
-seaborn
 pandas
-numexpr
 numpy
+bedtools
+pybedtools
+gffutils
+blat
+pyfasta
+seaborn
 xlrd
 xlwt
+numexpr

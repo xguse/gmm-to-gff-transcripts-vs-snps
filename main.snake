@@ -21,7 +21,7 @@ ORIGINAL_CONFIG_AS_STRING = yaml.dump(config, default_flow_style=False)
 #### COMMON RUN SPECIFICS ####
 
 RUN_NAME = config["COMMON"]["RUN_NAME"]
-OUT_DIR = "{base_dir}/{run_name}".format(base_dir=config["COMMON"]["OUT_DIR_LOCATION"], run_name=RUN_NAME)
+OUT_DIR = "{base_dir}/{run_name}".format(base_dir=config["COMMON"]["OUT_DIR"], run_name=RUN_NAME)
 
 
 
@@ -43,79 +43,188 @@ rule save_run_config:
 
 
 # ------------------------- #
-#### RULE_PYSCRIPT ####
-RULE_PYSCRIPT = config["RULE_PYSCRIPT"]
-
-# params
-SETTING1 = RULE_PYSCRIPT["SETTING1"]
-
-# inputs
-IN_FILE1 = RULE_PYSCRIPT["IN_FILE1"]
-IN_FILE2 = RULE_PYSCRIPT["IN_FILE2"]
-
-# outputs
-RULE_PYSCRIPT_OUT = OUT_DIR+"/RULE_PYSCRIPT"
-
-OUT_FILE1 = RULE_PYSCRIPT_OUT+'/out_file1.csv'
-OUT_FILE2 = RULE_PYSCRIPT_OUT+'/out_file2.txt'
-
+#### ANNOTATIONS_VIA_FASTA ####
+ANNOTATIONS_VIA_FASTA = config["ANNOTATIONS_VIA_FASTA"]
+ANNOTATIONS_VIA_FASTA_OUT = OUT_DIR+"/annotations_via_fasta"
+ANNOTATIONS_XLS = ANNOTATIONS_VIA_FASTA_OUT+"/annotations_via_fasta.xls"
+TX_FASTA = ANNOTATIONS_VIA_FASTA["TX_FASTA"]
+ORTHOLOG_TABLE = ANNOTATIONS_VIA_FASTA["ORTHOLOG_TABLE"]
 
 # ---
-rule rule_pyscript:
-    params:
-        setting1=SETTING1,
-
+rule annotations_via_fasta:
     input:
-        in_file1=IN_FILE1,
-        in_file2=IN_FILE2
+        tx_fasta=TX_FASTA,
+        ortholog_table=ORTHOLOG_TABLE
     output:
-        out_file1=OUT_FILE1,
-        out_file2=OUT_FILE2,
+        annotations_xls=ANNOTATIONS_XLS
 
     script:
-        "python/scripts/rule_pyscript.py"
+        "python/scripts/annotations_via_fasta.py"
 
 
 # ------------------------- #
-#### RULE_RSCRIPT ####
-RULE_RSCRIPT = config["RULE_RSCRIPT"]
+#### FILTER_PSL_TO_BED ####
+FILTER_PSL_TO_BED = config["FILTER_PSL_TO_BED"]
+PSL = FILTER_PSL_TO_BED["PSL"]
 
-# params
-SETTINGA = RULE_RSCRIPT["SETTINGA"]
+FILTER_PSL_TO_BED_OUT = OUT_DIR+"/filter_psl_to_bed"
+BED_FROM_PSL = FILTER_PSL_TO_BED_OUT+"/filtered_bed_from_psl.bed"
+TX_LENGTH_VS_HITS = FILTER_PSL_TO_BED_OUT+"/tx_length_vs_hits.png"
+FILTERED_TX_DATA = FILTER_PSL_TO_BED_OUT+"/filtered_tx_data.csv"
 
-# inputs
-IN_FILEA = RULE_RSCRIPT["IN_FILEA"]
-IN_FILEB = RULE_RSCRIPT["IN_FILEB"]
-
-# outputs
-RULE_RSCRIPT_OUT = OUT_DIR+"/rule_rscript"
-
-OUT_FILEA = RULE_RSCRIPT_OUT+'/out_filea.csv'
-OUT_FILEB = RULE_RSCRIPT_OUT+'/out_fileb.txt'
-
+config["FILTERED_TX_DATAFRAME"] = pd.DataFrame()
 
 # ---
-rule rule_rscript:
+rule filter_psl_to_bed:
     params:
-        settinga=SETTINGA,
-
+        bed_from_psl_coverage=FILTER_PSL_TO_BED["BED_FROM_PSL_COVERAGE"],
+        bed_from_psl_qsize=FILTER_PSL_TO_BED["BED_FROM_PSL_QSIZE"]
     input:
-        in_filea=IN_FILEA,
-        in_fileb=IN_FILEB
+        psl=PSL,
+        orthos=rules.annotations_via_fasta.output.annotations_xls
     output:
-        out_filea=OUT_FILEA,
-        out_fileb=OUT_FILEB,
+        bed_from_psl=BED_FROM_PSL,
+        tx_length_vs_hits=TX_LENGTH_VS_HITS,
+        filtered_tx_data=FILTERED_TX_DATA,
 
     script:
-        "r/scripts/rule_rscript.R"
+        "python/scripts/filter_psl_to_bed.py"
+
+
+# ------------------------- #
+#### SUBTRACT_GENE_MODELS ####
+SUBTRACT_GENE_MODELS = config["SUBTRACT_GENE_MODELS"]
+GENE_MODELS_BED = SUBTRACT_GENE_MODELS["GENE_MODELS_BED"]
+
+SUBTRACT_GENE_MODELS_OUT = OUT_DIR+"/subtract_gene_models"
+GENE_MODEL_SUBTRACTED = SUBTRACT_GENE_MODELS_OUT+"/gene_model_subtracted.bed"
+
+# ---
+rule subtract_gene_models:
+    input:
+        gene_models_bed=GENE_MODELS_BED,
+        bed_from_psl=rules.filter_psl_to_bed.output.bed_from_psl,
+
+    output:
+        gene_model_subtracted=GENE_MODEL_SUBTRACTED,
+
+    script:
+        "python/scripts/subtract_gene_models.py"
+
+
+# ------------------------- #
+#### MAKE_SNP_BEDS ####
+MAKE_SNP_BEDS = config["MAKE_SNP_BEDS"]
+SCAFFOLD_NAME_MAP = MAKE_SNP_BEDS["SCAFFOLD_NAME_MAP"]
+DO_CLEANING = MAKE_SNP_BEDS["DO_CLEANING"]
+SNP_FILES = MAKE_SNP_BEDS["SNP_FILES"]
+P_THRESH = MAKE_SNP_BEDS["P_THRESH"]
+
+MAKE_SNP_BEDS_OUT = OUT_DIR+"/make_snp_beds"
+SNP_BEDS = ["{path}/{basename}.bed".format(path=MAKE_SNP_BEDS_OUT, basename=os.path.splitext(os.path.basename(x))[0]) for x in SNP_FILES]
+
+# ---
+rule make_snp_beds:
+    params:
+        do_cleaning=DO_CLEANING,
+        scaffold_name_map=SCAFFOLD_NAME_MAP,
+        p_thresh=P_THRESH
+    input:
+        SNP_FILES
+    output:
+        SNP_BEDS
+
+    script:
+        "python/scripts/make_snp_beds.py"
+
+
+# ------------------------- #
+#### SORT_BED_FILES ####
+# ---
+rule sort_bed_files:
+    input:
+        snp_beds=rules.make_snp_beds.output,
+        gene_model_subtracted=rules.subtract_gene_models.output.gene_model_subtracted,
+        gene_models_bed=rules.subtract_gene_models.input.gene_models_bed
+
+    output:
+        sorted_status=OUT_DIR+"/sort_bed_files/sorted_status"
+
+    shell:
+        """
+
+            for i in {input}
+            do
+                sort -k1,1 -k2,2n $i > $i.tmp
+                mv $i.tmp $i
+            done
+            touch {output}
+        """
+
+
+
+
+
+# ------------------------- #
+#### GET_NEAREST_K_FEATURES ####
+GET_NEAREST_K_FEATURES = config["GET_NEAREST_K_FEATURES"]
+K_NUMBER = GET_NEAREST_K_FEATURES["K"]
+
+GET_NEAREST_K_FEATURES_OUT = OUT_DIR+'/get_nearest_k_features'
+NEAREST_FEATURES_BEDS = ["{path}/{basename}.nearest.bed".format(path=GET_NEAREST_K_FEATURES_OUT, basename=os.path.splitext(os.path.basename(x))[0]) for x in SNP_BEDS]
+
+SNPS_IN_FEATURES = ["{path}/{basename}.snps_in_features.xls".format(path=GET_NEAREST_K_FEATURES_OUT, basename=os.path.splitext(os.path.basename(x))[0]) for x in SNP_BEDS]
+
+# ---
+rule get_nearest_k_features:
+    params:
+        k_number=K_NUMBER
+    input:
+        snp_beds=rules.make_snp_beds.output,
+        gene_model_subtracted=rules.subtract_gene_models.output.gene_model_subtracted,
+        gene_models=rules.subtract_gene_models.input.gene_models_bed
+
+    output:
+        nearest_features_beds=NEAREST_FEATURES_BEDS,
+        snps_in_features=SNPS_IN_FEATURES,
+
+    script:
+        "python/scripts/get_nearest_k_features.py"
+
+    # run:
+    #     k_number = snakemake.params.k_number
+    #
+    #     snp_beds = snakemake.input.snp_beds
+    #     gene_model_subtracted = snakemake.input.gene_model_subtracted
+    #     genes_only_sorted = snakemake.input.genes_only_sorted
+    #
+    #
+    # nearest_features_beds = snakemake.output
+    #
+    #     for snp_bed, nearest_bed in zip(snp_beds, nearest_features_beds):
+    #
+    #         snp_bed = pbt.BedTool(snp_bed)
+    #         gene_model_subtracted_bed = pbt.BedTool(gene_model_subtracted)
+    #         genes_only_sorted_bed = pbt.BedTool(genes_only_sorted)
+    #
+    #     shell("""bedtools closest -a {input.snp_beds} -b {input.gene_model_subtracted} {input.genes_only_sorted} \
+    #     -k {params.k_number} \
+    #     -names novel_mapped_tx official_annotations \
+    #     -t all -D ref -mdb each > \
+    #     {output}""")
+
+# ------------------------- #
 
 
 
 #### ALL ####
 input_all = [rules.save_run_config.output,
-             rules.rule_pyscript.output,
-             rules.rule_rscript.output,
-             ]
+             rules.annotations_via_fasta.output,
+             rules.filter_psl_to_bed.output,
+             rules.subtract_gene_models.output,
+             rules.make_snp_beds.output,
+             rules.sort_bed_files.output,
+             rules.get_nearest_k_features.output]
 # ---
 rule all:
     input:
