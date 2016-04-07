@@ -1,4 +1,4 @@
-# This file may be used to create an environment using:
+# This file allows you to create an environment using:
 # $ conda create --name env_name -c bioconda  --file <this file>
 
 # REQUIRED: DO NOT CHANGE
@@ -19,3 +19,4 @@ seaborn
 xlrd
 xlwt
 numexpr
+click

@@ -1,5 +1,5 @@
 COMMON:
-    RUN_NAME: gmm_to_gff_testing_v2
+    RUN_NAME: gmm_to_gff_testing_filterPSL_100bp
     OUT_DIR: "/home/gus/MEGAsync/zim/main/Yale/Collaborations/Hongyu-tsetse/gmm_to_gff_pipeline/pipeline_runs"
     MAIN_SPECIES: "Glossina fuscipes fuscipes"
 
@@ -13,7 +13,7 @@ ANNOTATIONS_VIA_FASTA:
 FILTER_PSL_TO_BED:
     PSL: "/home/gus/MEGAsync/zim/main/Yale/Collaborations/Hongyu-tsetse/gmm_to_gff_pipeline/pipeline_prep/produced/gmm_transcripts_v_GfusI1_scaffold.dna2dna.psl"
     BED_FROM_PSL_COVERAGE: 0.90
-    BED_FROM_PSL_QSIZE: 60
+    BED_FROM_PSL_QSIZE: 100
 
 # --------------------------------------
 SUBTRACT_GENE_MODELS:
@@ -33,3 +33,30 @@ MAKE_SNP_BEDS:
 # --------------------------------------
 GET_NEAREST_K_FEATURES:
     K: 10
+
+# --------------------------------------
+MAKE_ID_TABLE_NO_DIFF_EXPR:
+    CUFFCMP_TRACKING: "/home/gus/MEGAsync/zim/main/Yale/Collaborations/Hongyu-tsetse/gmm_to_gff_pipeline/pipeline_prep/2016-02-05_comprehensive_Gmm_transcript_set/Gisella2016_Morsitan_transcriptome/cuffcmp.tracking"
+
+# --------------------------------------
+MAKE_ID_TABLE_WITH_DIFF_EXPR:
+    EDGER_RESULTS_INFO:
+        CONGO: "/home/gus/MEGAsync/zim/main/Yale/Collaborations/Hongyu-tsetse/gmm_to_gff_pipeline/pipeline_prep/2016NewAssembly_DE/2016newassembly_de/edgeR/Congo.edgeR.anno.txt"
+        MIDGUT: "/home/gus/MEGAsync/zim/main/Yale/Collaborations/Hongyu-tsetse/gmm_to_gff_pipeline/pipeline_prep/2016NewAssembly_DE/2016newassembly_de/edgeR/midgut.edgeR.anno.txt"
+        PB: "/home/gus/MEGAsync/zim/main/Yale/Collaborations/Hongyu-tsetse/gmm_to_gff_pipeline/pipeline_prep/2016NewAssembly_DE/2016newassembly_de/edgeR/PB.edgeR.anno.txt"
+        PV_PLUS_MINUS: "/home/gus/MEGAsync/zim/main/Yale/Collaborations/Hongyu-tsetse/gmm_to_gff_pipeline/pipeline_prep/2016NewAssembly_DE/2016newassembly_de/edgeR/PV_Plus_Minus.edgeR.anno.txt"
+        PV_PLUS_PLUS: "/home/gus/MEGAsync/zim/main/Yale/Collaborations/Hongyu-tsetse/gmm_to_gff_pipeline/pipeline_prep/2016NewAssembly_DE/2016newassembly_de/edgeR/PV_Plus_Plus.edgeR.anno.txt"
+        SG: "/home/gus/MEGAsync/zim/main/Yale/Collaborations/Hongyu-tsetse/gmm_to_gff_pipeline/pipeline_prep/2016NewAssembly_DE/2016newassembly_de/edgeR/SG.edgeR.anno.txt"
+    CUFFLINKS_RESULTS_INFO:
+        CONGO: "/home/gus/MEGAsync/zim/main/Yale/Collaborations/Hongyu-tsetse/gmm_to_gff_pipeline/pipeline_prep/2016NewAssembly_DE/2016newassembly_de/cuffdiff/Congo.cuffdiff.txt"
+        MIDGUT: "/home/gus/MEGAsync/zim/main/Yale/Collaborations/Hongyu-tsetse/gmm_to_gff_pipeline/pipeline_prep/2016NewAssembly_DE/2016newassembly_de/cuffdiff/midgut.cuffdiff.txt"
+        PB: "/home/gus/MEGAsync/zim/main/Yale/Collaborations/Hongyu-tsetse/gmm_to_gff_pipeline/pipeline_prep/2016NewAssembly_DE/2016newassembly_de/cuffdiff/PB.cuffdiff.txt"
+        PV_PLUS_MINUS: "/home/gus/MEGAsync/zim/main/Yale/Collaborations/Hongyu-tsetse/gmm_to_gff_pipeline/pipeline_prep/2016NewAssembly_DE/2016newassembly_de/cuffdiff/PV_Plus_Minus.cuffdiff.txt"
+        PV_PLUS_PLUS: "/home/gus/MEGAsync/zim/main/Yale/Collaborations/Hongyu-tsetse/gmm_to_gff_pipeline/pipeline_prep/2016NewAssembly_DE/2016newassembly_de/cuffdiff/PV_Plus_Plus.cuffdiff.txt"
+        SG: "/home/gus/MEGAsync/zim/main/Yale/Collaborations/Hongyu-tsetse/gmm_to_gff_pipeline/pipeline_prep/2016NewAssembly_DE/2016newassembly_de/cuffdiff/SG.cuffdiff.txt"
+# --------------------------------------
+SNPS_NEAR_HOMOLOGOUS_DE:
+    SNP_DISTANCE_FROM_GENE: 0
+    DE_TABLE_CHUNKSIZE: 1000
+    RUN_PARALLEL: "yes"
+    GENOME_BROWSER_URL: https://www.vectorbase.org/Glossina_fuscipes/Location/View?r=[chrom]:[left]-[right]

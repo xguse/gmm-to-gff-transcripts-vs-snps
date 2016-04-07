@@ -191,29 +191,119 @@ rule get_nearest_k_features:
     script:
         "python/scripts/get_nearest_k_features.py"
 
-    # run:
-    #     k_number = snakemake.params.k_number
-    #
-    #     snp_beds = snakemake.input.snp_beds
-    #     gene_model_subtracted = snakemake.input.gene_model_subtracted
-    #     genes_only_sorted = snakemake.input.genes_only_sorted
-    #
-    #
-    # nearest_features_beds = snakemake.output
-    #
-    #     for snp_bed, nearest_bed in zip(snp_beds, nearest_features_beds):
-    #
-    #         snp_bed = pbt.BedTool(snp_bed)
-    #         gene_model_subtracted_bed = pbt.BedTool(gene_model_subtracted)
-    #         genes_only_sorted_bed = pbt.BedTool(genes_only_sorted)
-    #
-    #     shell("""bedtools closest -a {input.snp_beds} -b {input.gene_model_subtracted} {input.genes_only_sorted} \
-    #     -k {params.k_number} \
-    #     -names novel_mapped_tx official_annotations \
-    #     -t all -D ref -mdb each > \
-    #     {output}""")
 
 # ------------------------- #
+#### MAKE_ID_TABLE_NO_DIFF_EXPR ####
+MAKE_ID_TABLE_NO_DIFF_EXPR = config["MAKE_ID_TABLE_NO_DIFF_EXPR"]
+
+CUFFCMP_TRACKING = MAKE_ID_TABLE_NO_DIFF_EXPR["CUFFCMP_TRACKING"]
+ORTHOLOG_TABLE = ANNOTATIONS_VIA_FASTA["ORTHOLOG_TABLE"]
+
+MAKE_ID_TABLE_NO_DIFF_EXPR_OUT = OUT_DIR+'/make_id_table_no_diff_expr'
+IDS_NO_DIFF_EXPR = MAKE_ID_TABLE_NO_DIFF_EXPR_OUT+'/ids_no_diff_expr.csv'
+
+# ---
+rule make_id_table_no_diff_expr:
+    input:
+        cuffcmp_tracking=CUFFCMP_TRACKING,
+        ortholog_table=ORTHOLOG_TABLE,
+
+    output:
+        ids_no_diff_expr=IDS_NO_DIFF_EXPR,
+
+    script:
+        "python/scripts/make_id_table_no_diff_expr.py"
+
+
+# ------------------------- #
+#### MAKE_ID_TABLE_WITH_DIFF_EXPR ####
+MAKE_ID_TABLE_WITH_DIFF_EXPR = config["MAKE_ID_TABLE_WITH_DIFF_EXPR"]
+
+IDS_NO_DIFF_EXPR = IDS_NO_DIFF_EXPR
+
+EDGER_RESULTS_LABELS = list(MAKE_ID_TABLE_WITH_DIFF_EXPR["EDGER_RESULTS_INFO"].keys())
+CUFFLINKS_RESULTS_LABELS = list(MAKE_ID_TABLE_WITH_DIFF_EXPR["CUFFLINKS_RESULTS_INFO"].keys())
+
+EDGER_RESULTS = [MAKE_ID_TABLE_WITH_DIFF_EXPR["EDGER_RESULTS_INFO"][label] for label in EDGER_RESULTS_LABELS]
+CUFFLINKS_RESULTS = [MAKE_ID_TABLE_WITH_DIFF_EXPR["CUFFLINKS_RESULTS_INFO"][label] for label in CUFFLINKS_RESULTS_LABELS]
+
+MAKE_ID_TABLE_WITH_DIFF_EXPR_OUT = OUT_DIR+'/make_id_table_with_diff_expr'
+IDS_WITH_DIFF_EXPR = MAKE_ID_TABLE_WITH_DIFF_EXPR_OUT+'/ids_with_diff_expr.csv'
+
+
+
+# ---
+rule make_id_table_with_diff_expr:
+    params:
+        edger_results_labels=EDGER_RESULTS_LABELS,
+        cufflinks_results_labels=CUFFLINKS_RESULTS_LABELS,
+    input:
+        edger_results=EDGER_RESULTS,
+        cufflinks_results=CUFFLINKS_RESULTS,
+        ids_no_diff_expr=IDS_NO_DIFF_EXPR,
+
+    output:
+        ids_with_diff_expr=IDS_WITH_DIFF_EXPR,
+
+    script:
+        "python/scripts/make_id_table_with_diff_expr.py"
+
+
+# ------------------------- #
+#### SNPS_NEAR_HOMOLOGOUS_DE ####
+SNPS_NEAR_HOMOLOGOUS_DE = config["SNPS_NEAR_HOMOLOGOUS_DE"]
+
+# params
+SNP_DISTANCE_FROM_GENE = SNPS_NEAR_HOMOLOGOUS_DE["SNP_DISTANCE_FROM_GENE"]
+DE_TABLE_CHUNKSIZE = SNPS_NEAR_HOMOLOGOUS_DE["DE_TABLE_CHUNKSIZE"]
+RUN_PARALLEL = SNPS_NEAR_HOMOLOGOUS_DE["RUN_PARALLEL"]
+GENOME_BROWSER_URL = SNPS_NEAR_HOMOLOGOUS_DE["GENOME_BROWSER_URL"]
+
+
+# input
+NEAREST_FEATURES_BEDS = NEAREST_FEATURES_BEDS
+IDS_WITH_DIFF_EXPR = IDS_WITH_DIFF_EXPR
+GENE_MODELS_BED = SUBTRACT_GENE_MODELS["GENE_MODELS_BED"]
+
+# output
+
+SNPS_NEAR_HOMOLOGOUS_DE_OUT = OUT_DIR+'/snps_near_homologous_de'
+SNPS_NEAR_HOMOLOGOUS_DE_PATH = SNPS_NEAR_HOMOLOGOUS_DE_OUT+'/snps_near_homologous_de_distance_{distance}.csv'.format(distance=SNP_DISTANCE_FROM_GENE)
+
+
+
+# ---
+rule snps_near_homologous_de:
+    params:
+        snp_distance_from_gene=SNP_DISTANCE_FROM_GENE,
+        de_table_chunksize=DE_TABLE_CHUNKSIZE,
+        run_parallel=RUN_PARALLEL,
+        genome_browser_url=GENOME_BROWSER_URL,
+
+    input:
+        nearest_features_beds=NEAREST_FEATURES_BEDS,
+        ids_with_diff_expr=IDS_WITH_DIFF_EXPR,
+        gene_models_bed=GENE_MODELS_BED,
+
+    output:
+        snps_near_homologous_de_path=SNPS_NEAR_HOMOLOGOUS_DE_PATH,
+
+    shell:
+        """python python/scripts/snps_near_homologous_de.py \
+        {input.nearest_features_beds} \
+        {input.ids_with_diff_expr} \
+        {output.snps_near_homologous_de_path} \
+        --distance {params.snp_distance_from_gene} \
+        --chunksize {params.de_table_chunksize} \
+        --parallel {params.run_parallel} \
+        --url '{params.genome_browser_url}' \
+        --bed {input.gene_models_bed} \
+        """
+
+
+# ------------------------- #
+
+
 
 
 
@@ -224,7 +314,10 @@ input_all = [rules.save_run_config.output,
              rules.subtract_gene_models.output,
              rules.make_snp_beds.output,
              rules.sort_bed_files.output,
-             rules.get_nearest_k_features.output]
+             rules.get_nearest_k_features.output,
+             rules.make_id_table_no_diff_expr.output,
+             rules.make_id_table_with_diff_expr.output,
+             rules.snps_near_homologous_de.output]
 # ---
 rule all:
     input:
