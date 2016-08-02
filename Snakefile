@@ -48,7 +48,131 @@ rule save_run_config:
 PREP.append(rules.save_run_config.output)
 MAIN.append(rules.save_run_config.output)
 
-# ------------------------- #
+
+# ------------ prep ------------- #
+#### MAKE_OOC ####
+MAKE_OOC = config["MAKE_OOC"]
+GENOME = MAKE_OOC["GENOME"]
+OLIGO_LEN = MAKE_OOC["OLIGO_LEN"]
+
+
+OOC = OUT_DIR_PREP+"/{OLIGO_LEN}.ooc".format(OLIGO_LEN=OLIGO_LEN)
+
+# ---
+rule make_ooc:
+    params:
+        oligo_len=OLIGO_LEN
+    input:
+        genome=GENOME,
+    output:
+        ooc=OOC
+
+    shell:
+        """blat {input.genome} \
+        /dev/null /dev/null \
+        -tileSize={params.oligo_len} -makeOoc={output.ooc}"""
+
+PREP.append(rules.make_ooc.output)
+
+# ------------ prep ------------- #
+#### RUN_BLAT ####
+RUN_BLAT = config["RUN_BLAT"]
+TRANSCRIPTS = RUN_BLAT["TRANSCRIPTS"]
+PSL_NAME = RUN_BLAT["PSL_NAME"]
+
+
+PSL = OUT_DIR_PREP+"/{psl_name}".format(psl_name=PSL_NAME)
+
+# ---
+rule run_blat:
+    params:
+        oligo_len=OLIGO_LEN
+    input:
+        genome=GENOME,
+        transcripts=TRANSCRIPTS,
+        ooc=rules.make_ooc.output.ooc
+    output:
+        psl=PSL
+
+    shell:
+        """blat {input.genome} {input.transcripts} \
+        -q=dna -t=dna -ooc={input.ooc} \
+        {output.psl} """
+
+PREP.append(rules.run_blat.output)
+
+# # ------------ prep ------------- #
+# #### GTF_JUST_EXONS ####
+# GTF_JUST_EXONS = config["GTF_JUST_EXONS"]
+# GTF_PATH = GTF_JUST_EXONS["GTF_PATH"]
+#
+# GTF_BASE_NAME = os.path.splitext(os.path.basename(GTF_PATH))
+# GTF_EXONS = OUT_DIR_PREP+"/{base_name}.exons.gtf".format(base_name=GTF_BASE_NAME[0])
+#
+# # ---
+# rule gtf_just_exons:
+#     input:
+#         gtf_path=GTF_PATH,
+#     output:
+#         gtf_exons=GTF_EXONS,
+#
+#     shell:
+#         """awk '/\texon\t/' \
+#         < {input.gtf_path} | \
+#         sort -k 1,1 -k 4,4n > \
+#         {output.gtf_exons}
+#         """
+
+# PREP.append(rules.gtf_just_exons.output)
+
+# ------------ prep ------------- #
+#### GTF_TO_BED ####
+GTF_TO_BED = config["GTF_TO_BED"]
+GTF = GTF_TO_BED["GTF"]
+
+BED_BASE_NAME = os.path.splitext(os.path.basename(GTF))
+
+BED = OUT_DIR_PREP+"/{base_name}.bed".format(base_name=BED_BASE_NAME[0])
+GTF_DB =  OUT_DIR_PREP+"/{base_name}.gtf.db".format(base_name=BED_BASE_NAME[0])
+
+# ---
+rule gtf_to_bed:
+    input:
+        gtf=GTF,
+    output:
+        bed=BED,
+        gtf_db=GTF_DB,
+
+    script:
+        "python/scripts/gtf_to_bed.py"
+
+PREP.append(rules.gtf_to_bed.output)
+
+# ------------ prep ------------- #
+#### SORT_GENES_BED ####
+GTF = GTF_TO_BED["GTF"]
+
+BED_SORTED = OUT_DIR_PREP+"/{base_name}.sorted.bed".format(base_name=BED_BASE_NAME[0])
+
+
+
+# ---
+rule sort_genes_bed:
+    input:
+        bed=rules.gtf_to_bed.output.bed,
+    output:
+        bed_sorted=BED_SORTED,
+
+    shell:
+        """sort -k 1,1 -k 2,2n \
+        {input.bed} > \
+        {output.bed_sorted}
+        """
+
+PREP.append(rules.sort_genes_bed.output)
+
+
+# ------------ main ------------- #
 #### ANNOTATIONS_VIA_FASTA ####
 ANNOTATIONS_VIA_FASTA = config["ANNOTATIONS_VIA_FASTA"]
 ANNOTATIONS_VIA_FASTA_OUT = OUT_DIR_MAIN+"/annotations_via_fasta"
@@ -71,10 +195,10 @@ rule annotations_via_fasta:
 
 MAIN.append(rules.annotations_via_fasta.output)
 
-# ------------------------- #
+# ------------ main ------------- #
 #### FILTER_PSL_TO_BED ####
 FILTER_PSL_TO_BED = config["FILTER_PSL_TO_BED"]
-PSL = FILTER_PSL_TO_BED["PSL"]
+PSL = PSL # defined in meta-target: PREP
 
 FILTER_PSL_TO_BED_OUT = OUT_DIR_MAIN+"/filter_psl_to_bed"
 BED_FROM_PSL = FILTER_PSL_TO_BED_OUT+"/filtered_bed_from_psl.bed"
@@ -103,10 +227,10 @@ rule filter_psl_to_bed:
 
 MAIN.append(rules.filter_psl_to_bed.output)
 
-# ------------------------- #
+# ------------ main ------------- #
 #### SUBTRACT_GENE_MODELS ####
 SUBTRACT_GENE_MODELS = config["SUBTRACT_GENE_MODELS"]
-GENE_MODELS_BED = SUBTRACT_GENE_MODELS["GENE_MODELS_BED"]
+GENE_MODELS_BED = rules.sort_genes_bed.output.bed_sorted
 
 SUBTRACT_GENE_MODELS_OUT = OUT_DIR_MAIN+"/subtract_gene_models"
 GENE_MODEL_SUBTRACTED = SUBTRACT_GENE_MODELS_OUT+"/gene_model_subtracted.bed"
@@ -127,7 +251,7 @@ rule subtract_gene_models:
 
 MAIN.append(rules.subtract_gene_models.output)
 
-# ------------------------- #
+# ------------ main ------------- #
 #### MAKE_SNP_BEDS ####
 MAKE_SNP_BEDS = config["MAKE_SNP_BEDS"]
 SCAFFOLD_NAME_MAP = MAKE_SNP_BEDS["SCAFFOLD_NAME_MAP"]
@@ -156,7 +280,7 @@ rule make_snp_beds:
 
 MAIN.append(rules.make_snp_beds.output)
 
-# ------------------------- #
+# ------------ main ------------- #
 #### SORT_BED_FILES ####
 # ---
 rule sort_bed_files:
@@ -181,7 +305,7 @@ rule sort_bed_files:
 
 MAIN.append(rules.sort_bed_files.output)
 
-# ------------------------- #
+# ------------ main ------------- #
 #### GET_NEAREST_K_FEATURES ####
 GET_NEAREST_K_FEATURES = config["GET_NEAREST_K_FEATURES"]
 K_NUMBER = GET_NEAREST_K_FEATURES["K"]
@@ -211,7 +335,7 @@ rule get_nearest_k_features:
 
 MAIN.append(rules.get_nearest_k_features.output)
 
-# ------------------------- #
+# ------------ main ------------- #
 #### MAKE_ID_TABLE_NO_DIFF_EXPR ####
 MAKE_ID_TABLE_NO_DIFF_EXPR = config["MAKE_ID_TABLE_NO_DIFF_EXPR"]
 
@@ -237,7 +361,7 @@ rule make_id_table_no_diff_expr:
 
 MAIN.append(rules.make_id_table_no_diff_expr.output)
 
-# ------------------------- #
+# ------------ main ------------- #
 #### MAKE_ID_TABLE_WITH_DIFF_EXPR ####
 MAKE_ID_TABLE_WITH_DIFF_EXPR = config["MAKE_ID_TABLE_WITH_DIFF_EXPR"]
 
@@ -274,7 +398,7 @@ rule make_id_table_with_diff_expr:
 
 MAIN.append(rules.make_id_table_with_diff_expr.output)
 
-# ------------------------- #
+# ------------ main ------------- #
 #### SNPS_NEAR_HOMOLOGOUS_DE ####
 SNPS_NEAR_HOMOLOGOUS_DE = config["SNPS_NEAR_HOMOLOGOUS_DE"]
 
@@ -288,7 +412,7 @@ GENOME_BROWSER_URL = SNPS_NEAR_HOMOLOGOUS_DE["GENOME_BROWSER_URL"]
 # input
 NEAREST_FEATURES_BEDS = NEAREST_FEATURES_BEDS
 IDS_WITH_DIFF_EXPR = IDS_WITH_DIFF_EXPR
-GENE_MODELS_BED = SUBTRACT_GENE_MODELS["GENE_MODELS_BED"]
+GENE_MODELS_BED = rules.sort_genes_bed.output.bed_sorted
 
 # output
 
@@ -329,11 +453,23 @@ rule snps_near_homologous_de:
 
 MAIN.append(rules.snps_near_homologous_de.output)
 
-# ------------------------- #
+# ------------ meta-targets ------------- #
 
+#### PREP ####
+# ---
+rule prep:
+    input:
+        PREP
 
 #### MAIN ####
 # ---
 rule main:
     input:
         MAIN
+
+#### ALL ####
+# ---
+rule all:
+    input:
+        MAIN,
+        PREP
