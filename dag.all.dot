@@ -1,0 +1,35 @@
+digraph snakemake_dag {
+    graph[bgcolor=white, margin=0];
+    node[shape=box, style=rounded, fontname=sans,                 fontsize=10, penwidth=2];
+    edge[penwidth=2, color=grey];
+	0[label = "annotations_via_fasta", color = "0.24 0.6 0.85", style="rounded,dashed"];
+	1[label = "make_id_table_no_diff_expr", color = "0.12 0.6 0.85", style="rounded,dashed"];
+	2[label = "get_nearest_k_features", color = "0.61 0.6 0.85", style="rounded,dashed"];
+	3[label = "snps_near_homologous_de", color = "0.06 0.6 0.85", style="rounded,dashed"];
+	/*4[label = "save_run_config", color = "0.55 0.6 0.85", style="rounded,dashed"];*/
+	5[label = "make_id_table_with_diff_expr", color = "0.36 0.6 0.85", style="rounded,dashed"];
+	6[label = "make_snp_beds", color = "0.00 0.6 0.85", style="rounded,dashed"];
+	/*7[label = "sort_bed_files", color = "0.30 0.6 0.85", style="rounded,dashed"];*/
+	8[label = "subtract_gene_models", color = "0.48 0.6 0.85", style="rounded,dashed"];
+	9[label = "filter_psl_to_bed", color = "0.18 0.6 0.85", style="rounded,dashed"];
+	/*10[label = "all", color = "0.42 0.6 0.85", style="rounded,dashed"];*/
+	6 -> 2
+	8 -> 2
+	2 -> 3
+	5 -> 3
+	1 -> 5
+	/*6 -> 7
+	8 -> 7*/
+	9 -> 8
+	0 -> 9
+	/*0 -> 10
+	1 -> 10
+	2 -> 10
+	3 -> 10
+	4 -> 10
+	5 -> 10
+	6 -> 10
+	8 -> 10
+	7 -> 10
+	9 -> 10*/
+}
