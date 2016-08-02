@@ -1,0 +1,18 @@
+digraph snakemake_dag {
+    graph[bgcolor=white, margin=0];
+    node[shape=box, style=rounded, fontname=sans,                 fontsize=10, penwidth=2];
+    edge[penwidth=2, color=grey];
+	0[label = "make_ooc", color = "0.42 0.6 0.85", style="rounded,dashed"];
+	1[label = "gtf_to_bed", color = "0.29 0.6 0.85", style="rounded,dashed"];
+	2[label = "prep", color = "0.12 0.6 0.85", style="rounded,dashed"];
+	3[label = "run_blat", color = "0.50 0.6 0.85", style="rounded,dashed"];
+	4[label = "save_run_config", color = "0.46 0.6 0.85", style="rounded,dashed"];
+	5[label = "sort_genes_bed", color = "0.33 0.6 0.85", style="rounded,dashed"];
+	0 -> 2
+	3 -> 2
+	1 -> 2
+	4 -> 2
+	5 -> 2
+	0 -> 3
+	1 -> 5
+}            
