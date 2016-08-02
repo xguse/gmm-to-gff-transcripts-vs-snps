@@ -8,6 +8,7 @@ snakemake>=3.4.2
 
 # Packages specific to your pipeline
 ipython
+jupyter
 pandas
 numpy
 bedtools

@@ -45,7 +45,7 @@ GENOME = MAKE_OOC["GENOME"]
 OLIGO_LEN = MAKE_OOC["OLIGO_LEN"]
 
 
-OOC = OUT_DIR+"/{OLIGO_LEN}.ooc"
+OOC = OUT_DIR+"/{OLIGO_LEN}.ooc".format(OLIGO_LEN=OLIGO_LEN)
 
 # ---
 rule make_ooc:
