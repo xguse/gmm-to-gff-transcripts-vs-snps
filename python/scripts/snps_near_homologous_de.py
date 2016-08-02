@@ -7,7 +7,6 @@ import pandas as pd
 
 from multiprocessing import Pool
 
-import ipdb
 
 bed_headers = ["chrom",
                "chromStart",
@@ -214,17 +213,18 @@ def run(distance,chunksize,parallel,url,bed,dryrun,knearest,diffexpr,output):
         exit(0)
 
 
-
+    print("BEGIN: join_all_k_nearest_with_de")
     results = join_all_k_nearest_with_de(knearest_paths=knearest,
                                          distance=distance,
                                          de_path=diffexpr,
                                          chunksize=chunksize,
                                          parallel=parallel)
+    print("END: join_all_k_nearest_with_de")
 
     if url:
         results = add_url_col(results, url, bed, bed_headers)
 
-    results.to_excel(output, index=False)
+    results.to_csv(output, index=False)
 
 
 
