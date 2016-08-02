@@ -22,9 +22,13 @@ ORIGINAL_CONFIG_AS_STRING = yaml.dump(config, default_flow_style=False)
 
 RUN_NAME = config["COMMON"]["RUN_NAME"]
 OUT_DIR = "{base_dir}/{run_name}".format(base_dir=config["COMMON"]["OUT_DIR"], run_name=RUN_NAME)
+OUT_DIR_MAIN = "{out_base}/main".format(out_base=OUT_DIR)
+OUT_DIR_PREP = "{out_base}/prep".format(out_base=OUT_DIR)
 
 
-
+# collect meta-target 'inputs'
+PREP = []
+MAIN = []
 
 ############ BEGIN PIPELINE RULES ############
 
@@ -41,11 +45,137 @@ rule save_run_config:
         with open(output.file, 'w') as cnf_out:
             cnf_out.write(ORIGINAL_CONFIG_AS_STRING)
 
+PREP.append(rules.save_run_config.output)
+MAIN.append(rules.save_run_config.output)
 
-# ------------------------- #
+
+# ------------ prep ------------- #
+#### MAKE_OOC ####
+MAKE_OOC = config["MAKE_OOC"]
+GENOME = MAKE_OOC["GENOME"]
+OLIGO_LEN = MAKE_OOC["OLIGO_LEN"]
+
+
+OOC = OUT_DIR_PREP+"/{OLIGO_LEN}.ooc".format(OLIGO_LEN=OLIGO_LEN)
+
+# ---
+rule make_ooc:
+    params:
+        oligo_len=OLIGO_LEN
+    input:
+        genome=GENOME,
+    output:
+        ooc=OOC
+
+    shell:
+        """blat {input.genome} \
+        /dev/null /dev/null \
+        -tileSize={params.oligo_len} -makeOoc={output.ooc}"""
+
+PREP.append(rules.make_ooc.output)
+
+# ------------ prep ------------- #
+#### RUN_BLAT ####
+RUN_BLAT = config["RUN_BLAT"]
+TRANSCRIPTS = RUN_BLAT["TRANSCRIPTS"]
+PSL_NAME = RUN_BLAT["PSL_NAME"]
+
+
+PSL = OUT_DIR_PREP+"/{psl_name}".format(psl_name=PSL_NAME)
+
+# ---
+rule run_blat:
+    params:
+        oligo_len=OLIGO_LEN
+    input:
+        genome=GENOME,
+        transcripts=TRANSCRIPTS,
+        ooc=rules.make_ooc.output.ooc
+    output:
+        psl=PSL
+
+    shell:
+        """blat {input.genome} {input.transcripts} \
+        -q=dna -t=dna -ooc={input.ooc} \
+        {output.psl} """
+
+PREP.append(rules.run_blat.output)
+
+# # ------------ prep ------------- #
+# #### GTF_JUST_EXONS ####
+# GTF_JUST_EXONS = config["GTF_JUST_EXONS"]
+# GTF_PATH = GTF_JUST_EXONS["GTF_PATH"]
+#
+# GTF_BASE_NAME = os.path.splitext(os.path.basename(GTF_PATH))
+# GTF_EXONS = OUT_DIR_PREP+"/{base_name}.exons.gtf".format(base_name=GTF_BASE_NAME[0])
+#
+# # ---
+# rule gtf_just_exons:
+#     input:
+#         gtf_path=GTF_PATH,
+#     output:
+#         gtf_exons=GTF_EXONS,
+#
+#     shell:
+#         """awk '/\texon\t/' \
+#         < {input.gtf_path} | \
+#         sort -k 1,1 -k 4,4n > \
+#         {output.gtf_exons}
+#         """
+
+# PREP.append(rules.gtf_just_exons.output)
+
+# ------------ prep ------------- #
+#### GTF_TO_BED ####
+GTF_TO_BED = config["GTF_TO_BED"]
+GTF = GTF_TO_BED["GTF"]
+
+BED_BASE_NAME = os.path.splitext(os.path.basename(GTF))
+
+BED = OUT_DIR_PREP+"/{base_name}.bed".format(base_name=BED_BASE_NAME[0])
+GTF_DB =  OUT_DIR_PREP+"/{base_name}.gtf.db".format(base_name=BED_BASE_NAME[0])
+
+# ---
+rule gtf_to_bed:
+    input:
+        gtf=GTF,
+    output:
+        bed=BED,
+        gtf_db=GTF_DB,
+
+    script:
+        "python/scripts/gtf_to_bed.py"
+
+PREP.append(rules.gtf_to_bed.output)
+
+# ------------ prep ------------- #
+#### SORT_GENES_BED ####
+GTF = GTF_TO_BED["GTF"]
+
+BED_SORTED = OUT_DIR_PREP+"/{base_name}.sorted.bed".format(base_name=BED_BASE_NAME[0])
+
+
+
+# ---
+rule sort_genes_bed:
+    input:
+        bed=rules.gtf_to_bed.output.bed,
+    output:
+        bed_sorted=BED_SORTED,
+
+    shell:
+        """sort -k 1,1 -k 2,2n \
+        {input.bed} > \
+        {output.bed_sorted}
+        """
+
+PREP.append(rules.sort_genes_bed.output)
+
+
+# ------------ main ------------- #
 #### ANNOTATIONS_VIA_FASTA ####
 ANNOTATIONS_VIA_FASTA = config["ANNOTATIONS_VIA_FASTA"]
-ANNOTATIONS_VIA_FASTA_OUT = OUT_DIR+"/annotations_via_fasta"
+ANNOTATIONS_VIA_FASTA_OUT = OUT_DIR_MAIN+"/annotations_via_fasta"
 ANNOTATIONS_XLS = ANNOTATIONS_VIA_FASTA_OUT+"/annotations_via_fasta.xls"
 TX_FASTA = ANNOTATIONS_VIA_FASTA["TX_FASTA"]
 ORTHOLOG_TABLE = ANNOTATIONS_VIA_FASTA["ORTHOLOG_TABLE"]
@@ -62,12 +192,15 @@ rule annotations_via_fasta:
         "python/scripts/annotations_via_fasta.py"
 
 
-# ------------------------- #
+
+MAIN.append(rules.annotations_via_fasta.output)
+
+# ------------ main ------------- #
 #### FILTER_PSL_TO_BED ####
 FILTER_PSL_TO_BED = config["FILTER_PSL_TO_BED"]
-PSL = FILTER_PSL_TO_BED["PSL"]
+PSL = PSL # defined in meta-target: PREP
 
-FILTER_PSL_TO_BED_OUT = OUT_DIR+"/filter_psl_to_bed"
+FILTER_PSL_TO_BED_OUT = OUT_DIR_MAIN+"/filter_psl_to_bed"
 BED_FROM_PSL = FILTER_PSL_TO_BED_OUT+"/filtered_bed_from_psl.bed"
 TX_LENGTH_VS_HITS = FILTER_PSL_TO_BED_OUT+"/tx_length_vs_hits.png"
 FILTERED_TX_DATA = FILTER_PSL_TO_BED_OUT+"/filtered_tx_data.csv"
@@ -91,12 +224,15 @@ rule filter_psl_to_bed:
         "python/scripts/filter_psl_to_bed.py"
 
 
-# ------------------------- #
+
+MAIN.append(rules.filter_psl_to_bed.output)
+
+# ------------ main ------------- #
 #### SUBTRACT_GENE_MODELS ####
 SUBTRACT_GENE_MODELS = config["SUBTRACT_GENE_MODELS"]
-GENE_MODELS_BED = SUBTRACT_GENE_MODELS["GENE_MODELS_BED"]
+GENE_MODELS_BED = rules.sort_genes_bed.output.bed_sorted
 
-SUBTRACT_GENE_MODELS_OUT = OUT_DIR+"/subtract_gene_models"
+SUBTRACT_GENE_MODELS_OUT = OUT_DIR_MAIN+"/subtract_gene_models"
 GENE_MODEL_SUBTRACTED = SUBTRACT_GENE_MODELS_OUT+"/gene_model_subtracted.bed"
 
 # ---
@@ -112,7 +248,10 @@ rule subtract_gene_models:
         "python/scripts/subtract_gene_models.py"
 
 
-# ------------------------- #
+
+MAIN.append(rules.subtract_gene_models.output)
+
+# ------------ main ------------- #
 #### MAKE_SNP_BEDS ####
 MAKE_SNP_BEDS = config["MAKE_SNP_BEDS"]
 SCAFFOLD_NAME_MAP = MAKE_SNP_BEDS["SCAFFOLD_NAME_MAP"]
@@ -120,7 +259,7 @@ DO_CLEANING = MAKE_SNP_BEDS["DO_CLEANING"]
 SNP_FILES = MAKE_SNP_BEDS["SNP_FILES"]
 P_THRESH = MAKE_SNP_BEDS["P_THRESH"]
 
-MAKE_SNP_BEDS_OUT = OUT_DIR+"/make_snp_beds"
+MAKE_SNP_BEDS_OUT = OUT_DIR_MAIN+"/make_snp_beds"
 SNP_BEDS = ["{path}/{basename}.bed".format(path=MAKE_SNP_BEDS_OUT, basename=os.path.splitext(os.path.basename(x))[0]) for x in SNP_FILES]
 
 # ---
@@ -138,7 +277,10 @@ rule make_snp_beds:
         "python/scripts/make_snp_beds.py"
 
 
-# ------------------------- #
+
+MAIN.append(rules.make_snp_beds.output)
+
+# ------------ main ------------- #
 #### SORT_BED_FILES ####
 # ---
 rule sort_bed_files:
@@ -148,7 +290,7 @@ rule sort_bed_files:
         gene_models_bed=rules.subtract_gene_models.input.gene_models_bed
 
     output:
-        sorted_status=OUT_DIR+"/sort_bed_files/sorted_status"
+        sorted_status=OUT_DIR_MAIN+"/sort_bed_files/sorted_status"
 
     shell:
         """
@@ -161,16 +303,14 @@ rule sort_bed_files:
             touch {output}
         """
 
+MAIN.append(rules.sort_bed_files.output)
 
-
-
-
-# ------------------------- #
+# ------------ main ------------- #
 #### GET_NEAREST_K_FEATURES ####
 GET_NEAREST_K_FEATURES = config["GET_NEAREST_K_FEATURES"]
 K_NUMBER = GET_NEAREST_K_FEATURES["K"]
 
-GET_NEAREST_K_FEATURES_OUT = OUT_DIR+'/get_nearest_k_features'
+GET_NEAREST_K_FEATURES_OUT = OUT_DIR_MAIN+'/get_nearest_k_features'
 NEAREST_FEATURES_BEDS = ["{path}/{basename}.nearest.bed".format(path=GET_NEAREST_K_FEATURES_OUT, basename=os.path.splitext(os.path.basename(x))[0]) for x in SNP_BEDS]
 
 SNPS_IN_FEATURES = ["{path}/{basename}.snps_in_features.xls".format(path=GET_NEAREST_K_FEATURES_OUT, basename=os.path.splitext(os.path.basename(x))[0]) for x in SNP_BEDS]
@@ -192,14 +332,17 @@ rule get_nearest_k_features:
         "python/scripts/get_nearest_k_features.py"
 
 
-# ------------------------- #
+
+MAIN.append(rules.get_nearest_k_features.output)
+
+# ------------ main ------------- #
 #### MAKE_ID_TABLE_NO_DIFF_EXPR ####
 MAKE_ID_TABLE_NO_DIFF_EXPR = config["MAKE_ID_TABLE_NO_DIFF_EXPR"]
 
 CUFFCMP_TRACKING = MAKE_ID_TABLE_NO_DIFF_EXPR["CUFFCMP_TRACKING"]
 ORTHOLOG_TABLE = ANNOTATIONS_VIA_FASTA["ORTHOLOG_TABLE"]
 
-MAKE_ID_TABLE_NO_DIFF_EXPR_OUT = OUT_DIR+'/make_id_table_no_diff_expr'
+MAKE_ID_TABLE_NO_DIFF_EXPR_OUT = OUT_DIR_MAIN+'/make_id_table_no_diff_expr'
 IDS_NO_DIFF_EXPR = MAKE_ID_TABLE_NO_DIFF_EXPR_OUT+'/ids_no_diff_expr.csv'
 
 # ---
@@ -215,7 +358,10 @@ rule make_id_table_no_diff_expr:
         "python/scripts/make_id_table_no_diff_expr.py"
 
 
-# ------------------------- #
+
+MAIN.append(rules.make_id_table_no_diff_expr.output)
+
+# ------------ main ------------- #
 #### MAKE_ID_TABLE_WITH_DIFF_EXPR ####
 MAKE_ID_TABLE_WITH_DIFF_EXPR = config["MAKE_ID_TABLE_WITH_DIFF_EXPR"]
 
@@ -227,7 +373,7 @@ CUFFLINKS_RESULTS_LABELS = list(MAKE_ID_TABLE_WITH_DIFF_EXPR["CUFFLINKS_RESULTS_
 EDGER_RESULTS = [MAKE_ID_TABLE_WITH_DIFF_EXPR["EDGER_RESULTS_INFO"][label] for label in EDGER_RESULTS_LABELS]
 CUFFLINKS_RESULTS = [MAKE_ID_TABLE_WITH_DIFF_EXPR["CUFFLINKS_RESULTS_INFO"][label] for label in CUFFLINKS_RESULTS_LABELS]
 
-MAKE_ID_TABLE_WITH_DIFF_EXPR_OUT = OUT_DIR+'/make_id_table_with_diff_expr'
+MAKE_ID_TABLE_WITH_DIFF_EXPR_OUT = OUT_DIR_MAIN+'/make_id_table_with_diff_expr'
 IDS_WITH_DIFF_EXPR = MAKE_ID_TABLE_WITH_DIFF_EXPR_OUT+'/ids_with_diff_expr.csv'
 
 
@@ -249,7 +395,10 @@ rule make_id_table_with_diff_expr:
         "python/scripts/make_id_table_with_diff_expr.py"
 
 
-# ------------------------- #
+
+MAIN.append(rules.make_id_table_with_diff_expr.output)
+
+# ------------ main ------------- #
 #### SNPS_NEAR_HOMOLOGOUS_DE ####
 SNPS_NEAR_HOMOLOGOUS_DE = config["SNPS_NEAR_HOMOLOGOUS_DE"]
 
@@ -263,11 +412,11 @@ GENOME_BROWSER_URL = SNPS_NEAR_HOMOLOGOUS_DE["GENOME_BROWSER_URL"]
 # input
 NEAREST_FEATURES_BEDS = NEAREST_FEATURES_BEDS
 IDS_WITH_DIFF_EXPR = IDS_WITH_DIFF_EXPR
-GENE_MODELS_BED = SUBTRACT_GENE_MODELS["GENE_MODELS_BED"]
+GENE_MODELS_BED = rules.sort_genes_bed.output.bed_sorted
 
 # output
 
-SNPS_NEAR_HOMOLOGOUS_DE_OUT = OUT_DIR+'/snps_near_homologous_de'
+SNPS_NEAR_HOMOLOGOUS_DE_OUT = OUT_DIR_MAIN+'/snps_near_homologous_de'
 SNPS_NEAR_HOMOLOGOUS_DE_PATH = SNPS_NEAR_HOMOLOGOUS_DE_OUT+'/snps_near_homologous_de_distance_{distance}.csv'.format(distance=SNP_DISTANCE_FROM_GENE)
 
 
@@ -301,24 +450,26 @@ rule snps_near_homologous_de:
         """
 
 
-# ------------------------- #
 
+MAIN.append(rules.snps_near_homologous_de.output)
 
+# ------------ meta-targets ------------- #
 
+#### PREP ####
+# ---
+rule prep:
+    input:
+        PREP
 
+#### MAIN ####
+# ---
+rule main:
+    input:
+        MAIN
 
 #### ALL ####
-input_all = [rules.save_run_config.output,
-             rules.annotations_via_fasta.output,
-             rules.filter_psl_to_bed.output,
-             rules.subtract_gene_models.output,
-             rules.make_snp_beds.output,
-             rules.sort_bed_files.output,
-             rules.get_nearest_k_features.output,
-             rules.make_id_table_no_diff_expr.output,
-             rules.make_id_table_with_diff_expr.output,
-             rules.snps_near_homologous_de.output]
 # ---
 rule all:
     input:
-        input_all
+        MAIN,
+        PREP
