@@ -22,6 +22,9 @@ ORIGINAL_CONFIG_AS_STRING = yaml.dump(config, default_flow_style=False)
 
 RUN_NAME = config["COMMON"]["RUN_NAME"]
 OUT_DIR = "{base_dir}/{run_name}".format(base_dir=config["COMMON"]["OUT_DIR"], run_name=RUN_NAME)
+OUT_DIR_MAIN = "{out_base}/main".format(out_base=OUT_DIR)
+OUT_DIR_PREP = "{out_base}/prep".format(out_base=OUT_DIR)
+
 
 # collect meta-target 'inputs'
 PREP = []
@@ -48,7 +51,7 @@ MAIN.append(rules.save_run_config.output)
 # ------------------------- #
 #### ANNOTATIONS_VIA_FASTA ####
 ANNOTATIONS_VIA_FASTA = config["ANNOTATIONS_VIA_FASTA"]
-ANNOTATIONS_VIA_FASTA_OUT = OUT_DIR+"/annotations_via_fasta"
+ANNOTATIONS_VIA_FASTA_OUT = OUT_DIR_MAIN+"/annotations_via_fasta"
 ANNOTATIONS_XLS = ANNOTATIONS_VIA_FASTA_OUT+"/annotations_via_fasta.xls"
 TX_FASTA = ANNOTATIONS_VIA_FASTA["TX_FASTA"]
 ORTHOLOG_TABLE = ANNOTATIONS_VIA_FASTA["ORTHOLOG_TABLE"]
@@ -73,7 +76,7 @@ MAIN.append(rules.annotations_via_fasta.output)
 FILTER_PSL_TO_BED = config["FILTER_PSL_TO_BED"]
 PSL = FILTER_PSL_TO_BED["PSL"]
 
-FILTER_PSL_TO_BED_OUT = OUT_DIR+"/filter_psl_to_bed"
+FILTER_PSL_TO_BED_OUT = OUT_DIR_MAIN+"/filter_psl_to_bed"
 BED_FROM_PSL = FILTER_PSL_TO_BED_OUT+"/filtered_bed_from_psl.bed"
 TX_LENGTH_VS_HITS = FILTER_PSL_TO_BED_OUT+"/tx_length_vs_hits.png"
 FILTERED_TX_DATA = FILTER_PSL_TO_BED_OUT+"/filtered_tx_data.csv"
@@ -105,7 +108,7 @@ MAIN.append(rules.filter_psl_to_bed.output)
 SUBTRACT_GENE_MODELS = config["SUBTRACT_GENE_MODELS"]
 GENE_MODELS_BED = SUBTRACT_GENE_MODELS["GENE_MODELS_BED"]
 
-SUBTRACT_GENE_MODELS_OUT = OUT_DIR+"/subtract_gene_models"
+SUBTRACT_GENE_MODELS_OUT = OUT_DIR_MAIN+"/subtract_gene_models"
 GENE_MODEL_SUBTRACTED = SUBTRACT_GENE_MODELS_OUT+"/gene_model_subtracted.bed"
 
 # ---
@@ -132,7 +135,7 @@ DO_CLEANING = MAKE_SNP_BEDS["DO_CLEANING"]
 SNP_FILES = MAKE_SNP_BEDS["SNP_FILES"]
 P_THRESH = MAKE_SNP_BEDS["P_THRESH"]
 
-MAKE_SNP_BEDS_OUT = OUT_DIR+"/make_snp_beds"
+MAKE_SNP_BEDS_OUT = OUT_DIR_MAIN+"/make_snp_beds"
 SNP_BEDS = ["{path}/{basename}.bed".format(path=MAKE_SNP_BEDS_OUT, basename=os.path.splitext(os.path.basename(x))[0]) for x in SNP_FILES]
 
 # ---
@@ -163,7 +166,7 @@ rule sort_bed_files:
         gene_models_bed=rules.subtract_gene_models.input.gene_models_bed
 
     output:
-        sorted_status=OUT_DIR+"/sort_bed_files/sorted_status"
+        sorted_status=OUT_DIR_MAIN+"/sort_bed_files/sorted_status"
 
     shell:
         """
@@ -183,7 +186,7 @@ MAIN.append(rules.sort_bed_files.output)
 GET_NEAREST_K_FEATURES = config["GET_NEAREST_K_FEATURES"]
 K_NUMBER = GET_NEAREST_K_FEATURES["K"]
 
-GET_NEAREST_K_FEATURES_OUT = OUT_DIR+'/get_nearest_k_features'
+GET_NEAREST_K_FEATURES_OUT = OUT_DIR_MAIN+'/get_nearest_k_features'
 NEAREST_FEATURES_BEDS = ["{path}/{basename}.nearest.bed".format(path=GET_NEAREST_K_FEATURES_OUT, basename=os.path.splitext(os.path.basename(x))[0]) for x in SNP_BEDS]
 
 SNPS_IN_FEATURES = ["{path}/{basename}.snps_in_features.xls".format(path=GET_NEAREST_K_FEATURES_OUT, basename=os.path.splitext(os.path.basename(x))[0]) for x in SNP_BEDS]
@@ -215,7 +218,7 @@ MAKE_ID_TABLE_NO_DIFF_EXPR = config["MAKE_ID_TABLE_NO_DIFF_EXPR"]
 CUFFCMP_TRACKING = MAKE_ID_TABLE_NO_DIFF_EXPR["CUFFCMP_TRACKING"]
 ORTHOLOG_TABLE = ANNOTATIONS_VIA_FASTA["ORTHOLOG_TABLE"]
 
-MAKE_ID_TABLE_NO_DIFF_EXPR_OUT = OUT_DIR+'/make_id_table_no_diff_expr'
+MAKE_ID_TABLE_NO_DIFF_EXPR_OUT = OUT_DIR_MAIN+'/make_id_table_no_diff_expr'
 IDS_NO_DIFF_EXPR = MAKE_ID_TABLE_NO_DIFF_EXPR_OUT+'/ids_no_diff_expr.csv'
 
 # ---
@@ -246,7 +249,7 @@ CUFFLINKS_RESULTS_LABELS = list(MAKE_ID_TABLE_WITH_DIFF_EXPR["CUFFLINKS_RESULTS_
 EDGER_RESULTS = [MAKE_ID_TABLE_WITH_DIFF_EXPR["EDGER_RESULTS_INFO"][label] for label in EDGER_RESULTS_LABELS]
 CUFFLINKS_RESULTS = [MAKE_ID_TABLE_WITH_DIFF_EXPR["CUFFLINKS_RESULTS_INFO"][label] for label in CUFFLINKS_RESULTS_LABELS]
 
-MAKE_ID_TABLE_WITH_DIFF_EXPR_OUT = OUT_DIR+'/make_id_table_with_diff_expr'
+MAKE_ID_TABLE_WITH_DIFF_EXPR_OUT = OUT_DIR_MAIN+'/make_id_table_with_diff_expr'
 IDS_WITH_DIFF_EXPR = MAKE_ID_TABLE_WITH_DIFF_EXPR_OUT+'/ids_with_diff_expr.csv'
 
 
@@ -289,7 +292,7 @@ GENE_MODELS_BED = SUBTRACT_GENE_MODELS["GENE_MODELS_BED"]
 
 # output
 
-SNPS_NEAR_HOMOLOGOUS_DE_OUT = OUT_DIR+'/snps_near_homologous_de'
+SNPS_NEAR_HOMOLOGOUS_DE_OUT = OUT_DIR_MAIN+'/snps_near_homologous_de'
 SNPS_NEAR_HOMOLOGOUS_DE_PATH = SNPS_NEAR_HOMOLOGOUS_DE_OUT+'/snps_near_homologous_de_distance_{distance}.csv'.format(distance=SNP_DISTANCE_FROM_GENE)
 
 
