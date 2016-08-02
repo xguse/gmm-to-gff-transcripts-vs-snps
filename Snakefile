@@ -23,8 +23,9 @@ ORIGINAL_CONFIG_AS_STRING = yaml.dump(config, default_flow_style=False)
 RUN_NAME = config["COMMON"]["RUN_NAME"]
 OUT_DIR = "{base_dir}/{run_name}".format(base_dir=config["COMMON"]["OUT_DIR"], run_name=RUN_NAME)
 
-
-
+# collect meta-target 'inputs'
+PREP = []
+MAIN = []
 
 ############ BEGIN PIPELINE RULES ############
 
@@ -41,6 +42,8 @@ rule save_run_config:
         with open(output.file, 'w') as cnf_out:
             cnf_out.write(ORIGINAL_CONFIG_AS_STRING)
 
+PREP.append(rules.save_run_config.output)
+MAIN.append(rules.save_run_config.output)
 
 # ------------------------- #
 #### ANNOTATIONS_VIA_FASTA ####
@@ -61,6 +64,9 @@ rule annotations_via_fasta:
     script:
         "python/scripts/annotations_via_fasta.py"
 
+
+
+MAIN.append(rules.annotations_via_fasta.output)
 
 # ------------------------- #
 #### FILTER_PSL_TO_BED ####
@@ -91,6 +97,9 @@ rule filter_psl_to_bed:
         "python/scripts/filter_psl_to_bed.py"
 
 
+
+MAIN.append(rules.filter_psl_to_bed.output)
+
 # ------------------------- #
 #### SUBTRACT_GENE_MODELS ####
 SUBTRACT_GENE_MODELS = config["SUBTRACT_GENE_MODELS"]
@@ -111,6 +120,9 @@ rule subtract_gene_models:
     script:
         "python/scripts/subtract_gene_models.py"
 
+
+
+MAIN.append(rules.subtract_gene_models.output)
 
 # ------------------------- #
 #### MAKE_SNP_BEDS ####
@@ -138,6 +150,9 @@ rule make_snp_beds:
         "python/scripts/make_snp_beds.py"
 
 
+
+MAIN.append(rules.make_snp_beds.output)
+
 # ------------------------- #
 #### SORT_BED_FILES ####
 # ---
@@ -161,9 +176,7 @@ rule sort_bed_files:
             touch {output}
         """
 
-
-
-
+MAIN.append(rules.sort_bed_files.output)
 
 # ------------------------- #
 #### GET_NEAREST_K_FEATURES ####
@@ -192,6 +205,9 @@ rule get_nearest_k_features:
         "python/scripts/get_nearest_k_features.py"
 
 
+
+MAIN.append(rules.get_nearest_k_features.output)
+
 # ------------------------- #
 #### MAKE_ID_TABLE_NO_DIFF_EXPR ####
 MAKE_ID_TABLE_NO_DIFF_EXPR = config["MAKE_ID_TABLE_NO_DIFF_EXPR"]
@@ -214,6 +230,9 @@ rule make_id_table_no_diff_expr:
     script:
         "python/scripts/make_id_table_no_diff_expr.py"
 
+
+
+MAIN.append(rules.make_id_table_no_diff_expr.output)
 
 # ------------------------- #
 #### MAKE_ID_TABLE_WITH_DIFF_EXPR ####
@@ -248,6 +267,9 @@ rule make_id_table_with_diff_expr:
     script:
         "python/scripts/make_id_table_with_diff_expr.py"
 
+
+
+MAIN.append(rules.make_id_table_with_diff_expr.output)
 
 # ------------------------- #
 #### SNPS_NEAR_HOMOLOGOUS_DE ####
@@ -301,24 +323,14 @@ rule snps_near_homologous_de:
         """
 
 
+
+MAIN.append(rules.snps_near_homologous_de.output)
+
 # ------------------------- #
 
 
-
-
-
-#### ALL ####
-input_all = [rules.save_run_config.output,
-             rules.annotations_via_fasta.output,
-             rules.filter_psl_to_bed.output,
-             rules.subtract_gene_models.output,
-             rules.make_snp_beds.output,
-             rules.sort_bed_files.output,
-             rules.get_nearest_k_features.output,
-             rules.make_id_table_no_diff_expr.output,
-             rules.make_id_table_with_diff_expr.output,
-             rules.snps_near_homologous_de.output]
+#### MAIN ####
 # ---
-rule all:
+rule main:
     input:
-        input_all
+        MAIN
