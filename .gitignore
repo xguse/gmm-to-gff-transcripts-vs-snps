@@ -1,3 +1,5 @@
+backup_data/
+
 *.pdf
 *.svg
 *.png
@@ -62,3 +64,19 @@ docs/_build/
 
 # PyBuilder
 target/
+
+# DotEnv configuration
+.env
+
+# Database
+*.db
+*.rdb
+
+# Pycharm
+.idea
+
+# IPython NB Checkpoints
+.ipynb_checkpoints/
+
+# exclude PROCESSED data from source control by default
+/data/

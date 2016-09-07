@@ -1,0 +1,93 @@
+COMMON:
+    RUN_NAME: gmm_to_gff_testing_filterPSL_100bp_local
+    OUT_DIR: "data/processed"
+    SHARED:
+        MAIN_SPECIES: "Glossina fuscipes fuscipes"
+        VCF_POPULATION_DIR: "data/external/populations/vcf"
+
+# ---------------- PREP ----------------------
+MAKE_OOC:
+    GENOME: "data/external/Glossina-fuscipes-IAEA_SCAFFOLDS_GfusI1.renamed.fa"
+    OLIGO_LEN: 11
+
+# ---------------- PREP ----------------------
+RUN_BLAT:
+    TRANSCRIPTS: "data/raw/transcripts/transcripts.fa"
+    PSL_NAME: "gmm_transcripts_v_GfusI1_scaffold.dna2dna.psl"
+    FORCE_RERUN: False
+# ---------------- PREP ----------------------
+# GTF_JUST_EXONS:
+#     GTF_PATH: "/home/gus/MEGAsync/zim/main/Yale/Collaborations/Hongyu-tsetse/gmm_to_gff_pipeline/pipeline_prep/Glossina-fuscipes-IAEA_BASEFEATURES_GfusI1.3.gtf"
+
+# ---------------- PREP ----------------------
+GTF_TO_BED:
+    GTF: "data/external/Glossina-fuscipes-IAEA_BASEFEATURES_GfusI1.3.gtf"
+
+
+
+# ---------------- MAIN ----------------------
+ANNOTATIONS_VIA_FASTA:
+    TX_FASTA: "data/raw/transcripts/transcripts.fa"
+    ORTHOLOG_TABLE: "data/external/vectorbase_orthologs_GMOY_GFUI.csv"
+
+# ---------------- MAIN ----------------------
+FILTER_PSL_TO_BED:
+    PSL: "MESG: Snakefile should be configured to use value defined in rule: run_blat"
+    BED_FROM_PSL_COVERAGE: 0.90
+    BED_FROM_PSL_QSIZE: 100
+
+# ---------------- MAIN ----------------------
+SUBTRACT_GENE_MODELS:
+    GENE_MODELS_BED: "MESG: Snakefile should be configured to use value stored in rules.sort_genes_bed.output.bed_sorted"
+
+# ---------------- MAIN ----------------------
+MAKE_SNP_BEDS:
+    DO_CLEANING: True
+    P_THRESH: 0.05
+    SCAFFOLD_NAME_MAP: "data/external/contig_name_length.csv"
+    SNP_FILES:
+        - "data/raw/snp_lists/OT.txt"
+        - "data/raw/snp_lists/MS.txt"
+        - "data/raw/snp_lists/NB.txt"
+        - "data/raw/snp_lists/MS_NB_OT.txt"
+
+# ---------------- MAIN ----------------------
+GET_NEAREST_K_FEATURES:
+    K: 10
+
+# ---------------- MAIN ----------------------
+MAKE_ID_TABLE_NO_DIFF_EXPR:
+    CUFFCMP_TRACKING: "data/raw/cuffcompare/cuffcmp.tracking"
+
+# ---------------- MAIN ----------------------
+MAKE_ID_TABLE_WITH_DIFF_EXPR:
+    EDGER_RESULTS_INFO:
+        CONGO: "data/raw/edgeR/Congo.edgeR.anno.txt"
+        MIDGUT: "data/raw/edgeR/midgut.edgeR.anno.txt"
+        PB: "data/raw/edgeR/PB.edgeR.anno.txt"
+        PV_PLUS_MINUS: "data/raw/edgeR/PV_Plus_Minus.edgeR.anno.txt"
+        PV_PLUS_PLUS: "data/raw/edgeR/PV_Plus_Plus.edgeR.anno.txt"
+        SG: "data/raw/edgeR/SG.edgeR.anno.txt"
+    CUFFLINKS_RESULTS_INFO:
+        CONGO: "data/raw/cuffdiff/Congo.cuffdiff.txt"
+        MIDGUT: "data/raw/cuffdiff/midgut.cuffdiff.txt"
+        PB: "data/raw/cuffdiff/PB.cuffdiff.txt"
+        PV_PLUS_MINUS: "data/raw/cuffdiff/PV_Plus_Minus.cuffdiff.txt"
+        PV_PLUS_PLUS: "data/raw/cuffdiff/PV_Plus_Plus.cuffdiff.txt"
+        SG: "data/raw/cuffdiff/SG.cuffdiff.txt"
+
+# ---------------- MAIN ----------------------
+SNPS_NEAR_HOMOLOGOUS_DE:
+    SNP_DISTANCE_FROM_GENE: 0
+    DE_TABLE_CHUNKSIZE: 1000
+    RUN_PARALLEL: "yes"
+    GENOME_BROWSER_URL: https://www.vectorbase.org/Glossina_fuscipes/Location/View?r=[chrom]:[left]-[right]
+
+# ---------------- MAIN ----------------------
+GET_LINKED_SNPS:
+    IN:
+        VCF_DIR: "data/external/populations/vcf"
+    OUT: None
+    PARAMS:
+        LD_WINDOW_BP: 100000
+        MIN_R2: 0.5

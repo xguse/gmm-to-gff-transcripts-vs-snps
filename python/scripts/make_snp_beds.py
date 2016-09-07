@@ -8,8 +8,8 @@ do_cleaning = snakemake.params.do_cleaning
 scaffold_name_map = snakemake.params.scaffold_name_map
 p_thresh = snakemake.params.p_thresh
 
-snp_files = snakemake.input
-snp_beds = snakemake.output
+snp_files = snakemake.input.snp_files
+snp_beds = snakemake.output.snp_beds
 
 
 def make_name_map(df):

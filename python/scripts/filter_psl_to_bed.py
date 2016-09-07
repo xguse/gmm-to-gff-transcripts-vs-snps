@@ -40,7 +40,7 @@ plt.savefig(filename=snakemake.output.tx_length_vs_hits, dpi=None,
 
 # filtered hits with annotated orthologs
 hits_per_tx_ortho = pd.merge(left=pd.DataFrame(hits_per_tx),
-                             right=orthos[["tx_tcons","Gene stable ID","{main_sp} gene stable ID".format(main_sp=snakemake.config["COMMON"]["MAIN_SPECIES"]),"Homology type"]],
+                             right=orthos[["tx_tcons","Gene stable ID","{main_sp} gene stable ID".format(main_sp=snakemake.config["COMMON"]['SHARED']["MAIN_SPECIES"]),"Homology type"]],
                              how='inner',
                              on=None, left_on=None, right_on="tx_tcons",
                              left_index=True, right_index=False)
