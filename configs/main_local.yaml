@@ -89,5 +89,5 @@ GET_LINKED_SNPS:
         VCF_DIR: "data/external/populations/vcf"
     OUT: None
     PARAMS:
-        LD_WINDOW_BP: 100000
+        LD_WINDOW_BP: 50000
         MIN_R2: 0.5
