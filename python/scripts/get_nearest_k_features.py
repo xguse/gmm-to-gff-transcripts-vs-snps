@@ -56,5 +56,5 @@ for snp_bed, nearest_bed, feature_hit_file in zip(snp_beds, nearest_features_bed
     nearest_df = pd.read_csv(nearest_bed, sep="\t", names=headers)
     nearest_df
 
-    in_features = nearest_df.query(""" abs(distance) <= 0 """)
+    in_features = nearest_df.query(""" abs(distance) >= 0 """)
     in_features.to_excel(feature_hit_file, index=False)
