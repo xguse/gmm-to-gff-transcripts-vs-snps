@@ -1,7 +1,8 @@
 """Snakemake file."""
-
 # See tutorial at: http://tiny.cc/snakemake_tutorial
 from pathlib import Path
+from glob import glob
+from pprint import pprint
 
 import os
 
@@ -92,9 +93,14 @@ OUT_DIR_MAIN = "{out_base}".format(out_base=OUT_DIR)
 OUT_DIR_PREP = "{out_base}".format(out_base=OUT_DIR)
 
 
+VCF_POPS = [str(vcf_pop.stem) for vcf_pop in RUN.d.VCF_POPULATION_DIR.glob('*.vcf')]
+SNP_SOURCES = ['original','linked']
+
 # collect meta-target 'inputs'
 PREP = []
 MAIN = []
+DEBUG = []
+
 
 ############ BEGIN PIPELINE RULES ############
 
@@ -170,69 +176,49 @@ rule run_blat:
 
 PREP.append(rules.run_blat.output)
 
-# # ------------ prep ------------- #
-# #### GTF_JUST_EXONS ####
-# GTF_JUST_EXONS = config["GTF_JUST_EXONS"]
-# GTF_PATH = GTF_JUST_EXONS["GTF_PATH"]
-#
-# GTF_BASE_NAME = os.path.splitext(os.path.basename(GTF_PATH))
-# GTF_EXONS = OUT_DIR_PREP+"/{base_name}.exons.gtf".format(base_name=GTF_BASE_NAME[0])
-#
-# # ---
-# rule gtf_just_exons:
-#     input:
-#         gtf_path=GTF_PATH,
-#     output:
-#         gtf_exons=GTF_EXONS,
-#
-#     shell:
-#         """awk '/\texon\t/' \
-#         < {input.gtf_path} | \
-#         sort -k 1,1 -k 4,4n > \
-#         {output.gtf_exons}
-#         """
-
-# PREP.append(rules.gtf_just_exons.output)
-
 # ------------ prep ------------- #
 #### GTF_TO_BED ####
 GTF_TO_BED = MyRule(run=RUN, name="GTF_TO_BED")
 #GTF_TO_BED = config["GTF_TO_BED"]
-GTF = str(GTF_TO_BED.GTF)
 
-BED_BASE_NAME = os.path.splitext(os.path.basename(GTF))
+# inputs
+GTF_TO_BED.i.gtf = str(GTF_TO_BED.GTF_PATH)
 
-BED = str(GTF_TO_BED.out_dir / "{base_name}.bed".format(base_name=BED_BASE_NAME[0]))
-GTF_DB =  str(GTF_TO_BED.out_dir / "{base_name}.gtf.db".format(base_name=BED_BASE_NAME[0]))
+# outputs
+GTF_TO_BED.o.bed = str(GTF_TO_BED.out_dir / "{base_name}.bed".format(base_name=GTF_TO_BED.GTF_PATH.stem))
+GTF_TO_BED.o.gtf_db = str(GTF_TO_BED.out_dir / "{base_name}.gtf.db".format(base_name=GTF_TO_BED.GTF_PATH.stem))
+
+
 
 # ---
 rule gtf_to_bed:
     input:
-        gtf=GTF,
+        gtf=GTF_TO_BED.i.gtf,
     output:
-        bed=BED,
-        gtf_db=GTF_DB,
+        bed=GTF_TO_BED.o.bed,
+        gtf_db=GTF_TO_BED.o.gtf_db,
 
     script:
         "python/scripts/gtf_to_bed.py"
 
-PREP.append(rules.gtf_to_bed.output)
+PREP.append(GTF_TO_BED.o.bed)
+PREP.append(GTF_TO_BED.o.gtf_db)
 
 # ------------ prep ------------- #
 #### SORT_GENES_BED ####
 SORT_GENES_BED = MyRule(run=RUN, name="SORT_GENES_BED")
-GTF = str(GTF_TO_BED.GTF)
 
-BED_SORTED = str(SORT_GENES_BED.out_dir / "{base_name}.sorted.bed".format(base_name=BED_BASE_NAME[0]))
+
+SORT_GENES_BED.o.bed_sorted = str(SORT_GENES_BED.out_dir / "{base_name}.sorted.bed".format(base_name=GTF_TO_BED.GTF_PATH.stem))
 
 
 
 # ---
 rule sort_genes_bed:
     input:
-        bed=rules.gtf_to_bed.output.bed,
+        bed=GTF_TO_BED.o.bed,
     output:
-        bed_sorted=BED_SORTED,
+        bed_sorted=SORT_GENES_BED.o.bed_sorted,
 
     shell:
         "sort -k 1,1 -k 2,2n "
@@ -240,7 +226,7 @@ rule sort_genes_bed:
         "{output.bed_sorted}"
 
 
-PREP.append(rules.sort_genes_bed.output)
+PREP.append(SORT_GENES_BED.o.bed_sorted)
 
 
 # ------------ main ------------- #
@@ -273,10 +259,10 @@ FILTER_PSL_TO_BED = MyRule(run=RUN, name="FILTER_PSL_TO_BED")
 #FILTER_PSL_TO_BED = config["FILTER_PSL_TO_BED"]
 PSL = PSL # defined in meta-target: PREP
 
-FILTER_PSL_TO_BED_OUT = str(FILTER_PSL_TO_BED.out_dir)
-BED_FROM_PSL = FILTER_PSL_TO_BED_OUT+"/filtered_bed_from_psl.bed"
-TX_LENGTH_VS_HITS = FILTER_PSL_TO_BED_OUT+"/tx_length_vs_hits.png"
-FILTERED_TX_DATA = FILTER_PSL_TO_BED_OUT+"/filtered_tx_data.csv"
+
+FILTER_PSL_TO_BED.o.bed_from_psl = str(FILTER_PSL_TO_BED.out_dir)+"/filtered_bed_from_psl.bed"
+FILTER_PSL_TO_BED.o.tx_length_vs_hits = str(FILTER_PSL_TO_BED.out_dir)+"/tx_length_vs_hits.png"
+FILTER_PSL_TO_BED.o.filtered_tx_data = str(FILTER_PSL_TO_BED.out_dir)+"/filtered_tx_data.csv"
 
 config["FILTERED_TX_DATAFRAME"] = pd.DataFrame()
 
@@ -289,71 +275,73 @@ rule filter_psl_to_bed:
         psl=PSL,
         orthos=rules.annotations_via_fasta.output.annotations_xls
     output:
-        bed_from_psl=BED_FROM_PSL,
-        tx_length_vs_hits=TX_LENGTH_VS_HITS,
-        filtered_tx_data=FILTERED_TX_DATA,
+        bed_from_psl=FILTER_PSL_TO_BED.o.bed_from_psl,
+        tx_length_vs_hits=FILTER_PSL_TO_BED.o.tx_length_vs_hits,
+        filtered_tx_data=FILTER_PSL_TO_BED.o.filtered_tx_data,
 
     script:
         "python/scripts/filter_psl_to_bed.py"
 
 
 
-MAIN.append(rules.filter_psl_to_bed.output)
+MAIN.append(FILTER_PSL_TO_BED.o.bed_from_psl)
+MAIN.append(FILTER_PSL_TO_BED.o.tx_length_vs_hits)
+MAIN.append(FILTER_PSL_TO_BED.o.filtered_tx_data)
 
 # ------------ main ------------- #
 #### SUBTRACT_GENE_MODELS ####
 SUBTRACT_GENE_MODELS = MyRule(run=RUN, name="SUBTRACT_GENE_MODELS")
 #SUBTRACT_GENE_MODELS = config["SUBTRACT_GENE_MODELS"]
-GENE_MODELS_BED = rules.sort_genes_bed.output.bed_sorted
 
-SUBTRACT_GENE_MODELS_OUT = str(SUBTRACT_GENE_MODELS.out_dir)
-GENE_MODEL_SUBTRACTED = SUBTRACT_GENE_MODELS_OUT+"/gene_model_subtracted.bed"
+
+SUBTRACT_GENE_MODELS.o.gene_model_subtracted = str(SUBTRACT_GENE_MODELS.out_dir)+"/gene_model_subtracted.bed"
 
 # ---
 rule subtract_gene_models:
     input:
-        gene_models_bed=GENE_MODELS_BED,
-        bed_from_psl=rules.filter_psl_to_bed.output.bed_from_psl,
+        gene_models_bed=SORT_GENES_BED.o.bed_sorted,
+        bed_from_psl=FILTER_PSL_TO_BED.o.bed_from_psl,
 
     output:
-        gene_model_subtracted=GENE_MODEL_SUBTRACTED,
+        gene_model_subtracted=SUBTRACT_GENE_MODELS.o.gene_model_subtracted,
 
     script:
         "python/scripts/subtract_gene_models.py"
 
-MAIN.append(rules.subtract_gene_models.output)
+MAIN.append(SUBTRACT_GENE_MODELS.o.gene_model_subtracted)
 
 
 # ------------ main ------------- #
 #### MAKE_SNP_BEDS ####
 MAKE_SNP_BEDS = MyRule(run=RUN, name="MAKE_SNP_BEDS")
 #MAKE_SNP_BEDS = config["MAKE_SNP_BEDS"]
-SCAFFOLD_NAME_MAP = MAKE_SNP_BEDS.SCAFFOLD_NAME_MAP
-DO_CLEANING = MAKE_SNP_BEDS.DO_CLEANING
-SNP_FILES = [Path(snp_file) for snp_file in MAKE_SNP_BEDS.SNP_FILES]
-P_THRESH = MAKE_SNP_BEDS.P_THRESH
 
-MAKE_SNP_BEDS_OUT = str(MAKE_SNP_BEDS.out_dir)
-SNP_BEDS = ["{path}/{basename}.bed".format(path=MAKE_SNP_BEDS_OUT, basename=f.stem) for f in SNP_FILES]
-SNP_FILES = [str(f) for f in SNP_FILES]
+# inputs
+MAKE_SNP_BEDS.i.snp_files_wldcd = '{}'.format(MAKE_SNP_BEDS.ORIG_SNP_DIR) + '/{vcf_pop}.txt'
+MAKE_SNP_BEDS.i.snp_files_expanded = expand(MAKE_SNP_BEDS.i.snp_files_wldcd,vcf_pop=VCF_POPS)
 
+# outputs
+# SNP_BEDS = ["{path}/{basename}.bed".format(path=MAKE_SNP_BEDS_OUT, basename=f.stem) for f in SNP_FILES]
+MAKE_SNP_BEDS.o.snp_beds_wldcd = str(MAKE_SNP_BEDS.out_dir / '{vcf_pop}.original.bed')
+MAKE_SNP_BEDS.o.snp_beds_expanded = expand(MAKE_SNP_BEDS.o.snp_beds_wldcd,vcf_pop=VCF_POPS)
+
+# print(MAKE_SNP_BEDS.o.snp_beds_expanded)
 
 # ---
 rule make_snp_beds:
     params:
-        do_cleaning=DO_CLEANING,
-        scaffold_name_map=SCAFFOLD_NAME_MAP,
-        p_thresh=P_THRESH
+        do_cleaning=MAKE_SNP_BEDS.DO_CLEANING,
+        scaffold_name_map=MAKE_SNP_BEDS.SCAFFOLD_NAME_MAP,
+        p_thresh=MAKE_SNP_BEDS.P_THRESH
     input:
-        snp_files=SNP_FILES
+        snp_files=MAKE_SNP_BEDS.i.snp_files_wldcd
     output:
-        snp_beds=SNP_BEDS
+        snp_beds=MAKE_SNP_BEDS.o.snp_beds_wldcd
 
     script:
         "python/scripts/make_snp_beds.py"
 
-
-MAIN.append(rules.make_snp_beds.output)
+MAIN.append(MAKE_SNP_BEDS.o.snp_beds_expanded)
 
 # ------------ main ------------- #
 #### SORT_BED_FILES ####
@@ -362,9 +350,9 @@ SORT_BED_FILES = MyRule(run=RUN, name="SORT_BED_FILES")
 # ---
 rule sort_bed_files:
     input:
-        snp_beds=rules.make_snp_beds.output,
-        gene_model_subtracted=rules.subtract_gene_models.output.gene_model_subtracted,
-        gene_models_bed=rules.subtract_gene_models.input.gene_models_bed
+        snp_beds=MAKE_SNP_BEDS.o.snp_beds_expanded,
+        gene_model_subtracted=SUBTRACT_GENE_MODELS.o.gene_model_subtracted,
+        gene_models_bed=SORT_GENES_BED.o.bed_sorted
 
     output:
         sorted_status=str(SORT_BED_FILES.out_dir / "sorted_status")
@@ -383,32 +371,43 @@ MAIN.append(rules.sort_bed_files.output)
 #### GET_NEAREST_K_FEATURES ####
 GET_NEAREST_K_FEATURES = MyRule(run=RUN, name="GET_NEAREST_K_FEATURES")
 #GET_NEAREST_K_FEATURES = config["GET_NEAREST_K_FEATURES"]
-K_NUMBER = GET_NEAREST_K_FEATURES.K
 
-GET_NEAREST_K_FEATURES_OUT = str(GET_NEAREST_K_FEATURES.out_dir)
-NEAREST_FEATURES_BEDS = ["{path}/{basename}.nearest.bed".format(path=GET_NEAREST_K_FEATURES_OUT, basename=os.path.splitext(os.path.basename(x))[0]) for x in SNP_BEDS]
+# inputs
+# GET_NEAREST_K_FEATURES.i.snp_beds_rule_out_values = ['make_snp_beds','get_linked_snps']
+# GET_NEAREST_K_FEATURES.i.snp_beds_wldcd = str(RUN.out_dir / "{rule_out}/{bed}.bed")
+# GET_NEAREST_K_FEATURES.i.snp_beds_expanded = expand(GET_NEAREST_K_FEATURES.i.snp_beds_wldcd,
+#                                                     rule_out=GET_NEAREST_K_FEATURES.i.snp_beds_rule_out_values)
 
-SNPS_IN_FEATURES = ["{path}/{basename}.snps_in_features.xls".format(path=GET_NEAREST_K_FEATURES_OUT, basename=os.path.splitext(os.path.basename(x))[0]) for x in SNP_BEDS]
+# pprint(GET_NEAREST_K_FEATURES.i.snp_beds_expanded)
+
+# outputs
+GET_NEAREST_K_FEATURES.o.nearest_features_bed_wldcd = str(GET_NEAREST_K_FEATURES.out_dir / "{vcf_pop}.{kind}.nearest.bed")
+GET_NEAREST_K_FEATURES.o.nearest_features_bed_expanded = expand(GET_NEAREST_K_FEATURES.o.nearest_features_bed_wldcd, vcf_pop=VCF_POPS, kind=SNP_SOURCES)
+GET_NEAREST_K_FEATURES.o.snps_in_features_wldcd = str(GET_NEAREST_K_FEATURES.out_dir / "{vcf_pop}.{kind}.snps_in_features.xls")
+GET_NEAREST_K_FEATURES.o.snps_in_features_expanded = expand(GET_NEAREST_K_FEATURES.o.snps_in_features_wldcd, vcf_pop=VCF_POPS, kind=SNP_SOURCES)
+
 
 # ---
 rule get_nearest_k_features:
     params:
-        k_number=K_NUMBER
+        k_number=GET_NEAREST_K_FEATURES.PARAMS.K
     input:
-        snp_beds=rules.make_snp_beds.output,
-        gene_model_subtracted=rules.subtract_gene_models.output.gene_model_subtracted,
-        gene_models=rules.subtract_gene_models.input.gene_models_bed
+        snp_beds=[str(path) for path in list(RUN.out_dir.glob('**/*.linked.bed'))+list(RUN.out_dir.glob('**/*.original.bed'))],
+        gene_model_subtracted=SUBTRACT_GENE_MODELS.o.gene_model_subtracted,
+        gene_models=SORT_GENES_BED.o.bed_sorted
 
     output:
-        nearest_features_beds=NEAREST_FEATURES_BEDS,
-        snps_in_features=SNPS_IN_FEATURES,
+        nearest_features_beds=GET_NEAREST_K_FEATURES.o.nearest_features_bed_expanded,
+        snps_in_features=GET_NEAREST_K_FEATURES.o.snps_in_features_expanded,
 
     script:
         "python/scripts/get_nearest_k_features.py"
 
+# DEBUG.append(GET_NEAREST_K_FEATURES.o.nearest_features_bed_expanded)
+# DEBUG.append(GET_NEAREST_K_FEATURES.o.snps_in_features_expanded)
 
-
-MAIN.append(rules.get_nearest_k_features.output)
+MAIN.append(GET_NEAREST_K_FEATURES.o.nearest_features_bed_expanded)
+MAIN.append(GET_NEAREST_K_FEATURES.o.snps_in_features_expanded)
 
 # ------------ main ------------- #
 #### MAKE_ID_TABLE_NO_DIFF_EXPR ####
@@ -488,15 +487,11 @@ GENOME_BROWSER_URL = SNPS_NEAR_HOMOLOGOUS_DE.GENOME_BROWSER_URL
 
 
 # input
-NEAREST_FEATURES_BEDS = NEAREST_FEATURES_BEDS
 IDS_WITH_DIFF_EXPR = IDS_WITH_DIFF_EXPR
-GENE_MODELS_BED = rules.sort_genes_bed.output.bed_sorted
 
 # output
-
-SNPS_NEAR_HOMOLOGOUS_DE_OUT = str(SNPS_NEAR_HOMOLOGOUS_DE.out_dir)
-SNPS_NEAR_HOMOLOGOUS_DE_PATH = SNPS_NEAR_HOMOLOGOUS_DE_OUT+'/snps_near_homologous_de_distance_{distance}.csv'.format(distance=SNP_DISTANCE_FROM_GENE)
-
+SNPS_NEAR_HOMOLOGOUS_DE_PATH_WLDCD = str(SNPS_NEAR_HOMOLOGOUS_DE.out_dir / 'snps_near_homologous_de_distance_{distance}.{snp_source}.csv')
+SNPS_NEAR_HOMOLOGOUS_DE_PATH_EXPANDED = expand(SNPS_NEAR_HOMOLOGOUS_DE_PATH_WLDCD, distance=[SNP_DISTANCE_FROM_GENE], snp_source=SNP_SOURCES)
 
 
 # ---
@@ -508,12 +503,12 @@ rule snps_near_homologous_de:
         genome_browser_url=GENOME_BROWSER_URL,
 
     input:
-        nearest_features_beds=NEAREST_FEATURES_BEDS,
+        nearest_features_beds=GET_NEAREST_K_FEATURES.o.nearest_features_bed_expanded,
         ids_with_diff_expr=IDS_WITH_DIFF_EXPR,
-        gene_models_bed=GENE_MODELS_BED,
+        gene_models_bed=SORT_GENES_BED.o.bed_sorted,
 
     output:
-        snps_near_homologous_de_path=SNPS_NEAR_HOMOLOGOUS_DE_PATH,
+        snps_near_homologous_de_path=SNPS_NEAR_HOMOLOGOUS_DE_PATH_WLDCD,
 
     shell:
         """python python/scripts/snps_near_homologous_de.py \
@@ -527,18 +522,17 @@ rule snps_near_homologous_de:
         --bed {input.gene_models_bed} \
         """
 
-MAIN.append(rules.snps_near_homologous_de.output)
+MAIN.append(SNPS_NEAR_HOMOLOGOUS_DE_PATH_EXPANDED)
 
 # ------------------------- #
 #### GET_GENO_R2_POS ####
 GET_GENO_R2_POS = MyRule(run=RUN, name="GET_GENO_R2_POS")
-VCF_POPS = [str(vcf_pop.stem) for vcf_pop in RUN.d.VCF_POPULATION_DIR.glob('*.vcf')]
 
 # input
-GET_GENO_R2_POS.i.snp_bed = str(MAKE_SNP_BEDS.out_dir / "{vcf_pop}.bed")
+GET_GENO_R2_POS.i.snp_bed = str(MAKE_SNP_BEDS.out_dir / "{vcf_pop}.original.bed")
 
 # output
-GET_GENO_R2_POS.o.snp_pos_wldcd = str(GET_GENO_R2_POS.out_dir / "{vcf_pop}.pos")
+GET_GENO_R2_POS.o.snp_pos_wldcd = str(GET_GENO_R2_POS.out_dir / "{vcf_pop}.original.pos")
 GET_GENO_R2_POS.o.snp_pos_expanded = expand(GET_GENO_R2_POS.o.snp_pos_wldcd, vcf_pop=VCF_POPS)
 
 # ---
@@ -572,7 +566,7 @@ GET_LINKED_SNPS.p.out_prefix = str(GET_LINKED_SNPS.out_dir / "{vcf_pop}")
 
 # input
 GET_LINKED_SNPS.i.vcf = str(GET_LINKED_SNPS.IN.VCF_DIR / "{vcf_pop}.vcf")
-GET_LINKED_SNPS.i.snp_list = str(GET_GENO_R2_POS.out_dir / "{vcf_pop}.pos") # CHROM\tPOS
+GET_LINKED_SNPS.i.snp_list = str(GET_GENO_R2_POS.out_dir / "{vcf_pop}.original.pos") # CHROM\tPOS
 
 # output
 GET_LINKED_SNPS.o.linked_snps_wldcd = GET_LINKED_SNPS.p.out_prefix + ".list.geno.ld"
@@ -604,10 +598,49 @@ rule get_linked_snps:
         "--out {params.out_prefix} "
         "&> {log.path}"
 
+# DEBUG.append(GET_LINKED_SNPS.o.linked_snps_expanded)
 MAIN.append(GET_LINKED_SNPS.o.linked_snps_expanded)
 
 
+
+# ------------------------- #
+#### MAKE_LINKED_SNPS_BEDS ####
+MAKE_LINKED_SNPS_BEDS = MyRule(run=RUN, name="MAKE_LINKED_SNPS_BEDS")
+
+# input
+MAKE_LINKED_SNPS_BEDS.i.linked_snps_wldcd = GET_LINKED_SNPS.o.linked_snps_wldcd
+
+# output
+MAKE_LINKED_SNPS_BEDS.o.bed_wldcd = str(MAKE_LINKED_SNPS_BEDS.out_dir / "{vcf_pop}.linked.bed")
+MAKE_LINKED_SNPS_BEDS.o.bed_expanded = expand(MAKE_LINKED_SNPS_BEDS.o.bed_wldcd, vcf_pop=VCF_POPS)
+
+# ---
+rule make_linked_snps_beds:
+    log:
+        path=str(MAKE_LINKED_SNPS_BEDS.log)
+
+    input:
+        snp_file=MAKE_LINKED_SNPS_BEDS.i.linked_snps_wldcd,
+
+    output:
+        snp_bed=MAKE_LINKED_SNPS_BEDS.o.bed_wldcd,
+
+    script:
+        "python/scripts/make_linked_snps_beds.py"
+
+DEBUG.append(MAKE_LINKED_SNPS_BEDS.o.bed_expanded)
+MAIN.append(MAKE_LINKED_SNPS_BEDS.o.bed_expanded)
+
+
+
+
 # ------------ meta-targets ------------- #
+
+#### DEBUG ####
+# ---
+rule debug:
+    input:
+        DEBUG
 
 #### PREP ####
 # ---
@@ -628,6 +661,7 @@ rule all:
         MAIN,
         PREP
 
+
 #### PUT_PSL ####
 psl_dir_ = "{run_dir}/run_blat".format(run_dir=str(RUN.out_dir))
 # ---
@@ -635,3 +669,14 @@ rule put_psl:
     shell:
         "mkdir -p {psl_dir_}; "
         "tar --strip-components=3 -xvmf backup_data/gmm_transcripts_v_GfusI1_scaffold.dna2dna.psl.tar.gz -C {psl_dir_}; "
+        "touch {psl_dir_}/gmm_transcripts_v_GfusI1_scaffold.dna2dna.psl"
+
+# #### SAFE_CLEAN ####
+#
+# # ---
+# rule safe_clean:
+#     shell:
+#         "rm -rf; "
+#         "tar --strip-components=3 -xvmf backup_data/gmm_transcripts_v_GfusI1_scaffold.dna2dna.psl.tar.gz -C {psl_dir_}; "
+#         "touch {psl_dir_}/gmm_transcripts_v_GfusI1_scaffold.dna2dna.psl"
+#

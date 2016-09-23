@@ -34,8 +34,6 @@ headers = ["SNP_chrom",
           ]
 
 
-
-
 for snp_bed, nearest_bed, feature_hit_file in zip(snp_beds, nearest_features_beds, snps_in_features):
 
     snp_bed = pbt.BedTool(snp_bed)

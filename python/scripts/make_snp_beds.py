@@ -8,8 +8,8 @@ do_cleaning = snakemake.params.do_cleaning
 scaffold_name_map = snakemake.params.scaffold_name_map
 p_thresh = snakemake.params.p_thresh
 
-snp_files = snakemake.input.snp_files
-snp_beds = snakemake.output.snp_beds
+snp_file = snakemake.input.snp_files
+snp_bed = snakemake.output.snp_beds
 
 
 def make_name_map(df):
@@ -41,17 +41,19 @@ else:
     add_chrom_loc = add_chrom_loc_no_map
 
 
-for snp_file, snp_bed in zip(snp_files, snp_beds):
+## WE NOW DEPEND ON THE SNAKEFILE TO SEND ONLY ONE FILE AT A TIME
+# for snp_file, snp_bed in zip(snp_files, snp_beds):
+#################################################################
 
-    snp_list = pd.read_table(snp_file)
-    add_chrom_loc(df=snp_list, name_map=name_map)
+snp_list = pd.read_table(snp_file)
+add_chrom_loc(df=snp_list, name_map=name_map)
 
-    snp_list_passed = snp_list.query(""" P <= {thresh} """.format(thresh=p_thresh))
+snp_list_passed = snp_list.query(""" P <= {thresh} """.format(thresh=p_thresh))
 
-    bed_table = snp_list_passed[["CHROM","LOC"]].copy()
-    bed_table = bed_table.rename(columns={"LOC":"END"}).copy()
-    bed_table['START'] = bed_table.END - 1
-    bed_table = bed_table[["CHROM","START","END"]].sort_values(by=["CHROM","START"]).copy()
+bed_table = snp_list_passed[["CHROM","LOC"]].copy()
+bed_table = bed_table.rename(columns={"LOC":"END"}).copy()
+bed_table['START'] = bed_table.END - 1
+bed_table = bed_table[["CHROM","START","END"]].sort_values(by=["CHROM","START"]).copy()
 
 
-    bed_table.to_csv(snp_bed, header=False, index=False, sep='\t')
+bed_table.to_csv(snp_bed, header=False, index=False, sep='\t')
