@@ -4,6 +4,7 @@ COMMON:
     SHARED:
         MAIN_SPECIES: "Glossina fuscipes fuscipes"
         VCF_POPULATION_DIR: "data/external/populations/vcf"
+        SCAFFOLD_NAME_MAP: "data/external/contig_name_length.csv"
 
 # ---------------- PREP ----------------------
 MAKE_OOC:
@@ -21,7 +22,7 @@ RUN_BLAT:
 
 # ---------------- PREP ----------------------
 GTF_TO_BED:
-    GTF: "data/external/Glossina-fuscipes-IAEA_BASEFEATURES_GfusI1.3.gtf"
+    GTF_PATH: "data/external/Glossina-fuscipes-IAEA_BASEFEATURES_GfusI1.3.gtf"
 
 
 
@@ -45,15 +46,12 @@ MAKE_SNP_BEDS:
     DO_CLEANING: True
     P_THRESH: 0.05
     SCAFFOLD_NAME_MAP: "data/external/contig_name_length.csv"
-    SNP_FILES:
-        - "data/raw/snp_lists/OT.txt"
-        - "data/raw/snp_lists/MS.txt"
-        - "data/raw/snp_lists/NB.txt"
-        - "data/raw/snp_lists/MS_NB_OT.txt"
+    ORIG_SNP_DIR: "data/raw/snp_lists"
 
 # ---------------- MAIN ----------------------
 GET_NEAREST_K_FEATURES:
-    K: 10
+    PARAMS:
+        K: 10
 
 # ---------------- MAIN ----------------------
 MAKE_ID_TABLE_NO_DIFF_EXPR:
@@ -89,5 +87,5 @@ GET_LINKED_SNPS:
         VCF_DIR: "data/external/populations/vcf"
     OUT: None
     PARAMS:
-        LD_WINDOW_BP: 50000
-        MIN_R2: 0.5
+        LD_WINDOW_BP: 5000
+        MIN_R2: 0.2
