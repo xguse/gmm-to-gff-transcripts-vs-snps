@@ -105,19 +105,24 @@ def join_one_k_nearest_with_de(knearest_path, distance, de_path, chunksize):
 
     results = []
     for chunk in load_de_genes_tx(path=de_path, chunksize=chunksize):
-
+        # valid_feature_set_names = ['official_annotations','novel_mapped_tx']
         for feature_set_name, group in kn_by_feature_set:
 
-            if feature_set_name == 'official_annotations':
-                join_column = 'gene_id_internal'
-            elif feature_set_name == 'novel_mapped_tx':
-                join_column = 'tcons_id'
+            # if feature_set_name not in valid_feature_set_names:
+            #     raise ValueError('feature_set_name: "{feature_set_name}" is not valid. valid_feature_set_names = {valid_feature_set_names}'.format(feature_set_name=feature_set_name,valid_feature_set_names=valid_feature_set_names))
+            try:
+                if feature_set_name == 'official_annotations':
+                    join_column = 'gene_id_internal'
+                elif feature_set_name == 'novel_mapped_tx':
+                    join_column = 'tcons_id'
 
-            merged_chunk = group.merge(right=chunk, how='inner',
-                                       on=None, left_on="proximal_id", right_on=join_column,
-                                       left_index=False, right_index=False)
+                merged_chunk = group.merge(right=chunk, how='inner',
+                                           on=None, left_on="proximal_id", right_on=join_column,
+                                           left_index=False, right_index=False)
 
-            results.append(merged_chunk.copy())
+                results.append(merged_chunk.copy())
+            except UnboundLocalError:
+                continue
 
     # results_flattened = [result for sublist in results for result in sublist]
     return results

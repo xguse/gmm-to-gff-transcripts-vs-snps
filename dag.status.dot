@@ -1,0 +1,108 @@
+digraph snakemake_dag {
+    graph[bgcolor=white, margin=0];
+    node[shape=box, style=rounded, fontname=sans,                 fontsize=10, penwidth=2];
+    edge[penwidth=2, color=grey];
+	0[label = "make_snp_beds\nvcf_pop: MS_NB_OT", color = "0.36 0.6 0.85", style="rounded,dashed"];
+	1[label = "get_linked_snps", color = "0.61 0.6 0.85", style="rounded,dashed"];
+	2[label = "annotations_via_fasta", color = "0.00 0.6 0.85", style="rounded,dashed"];
+	3[label = "get_geno_r2_pos", color = "0.42 0.6 0.85", style="rounded,dashed"];
+	4[label = "make_ooc", color = "0.55 0.6 0.85", style="rounded,dashed"];
+	5[label = "gtf_to_bed", color = "0.24 0.6 0.85", style="rounded,dashed"];
+	6[label = "make_id_table_with_diff_expr", color = "0.27 0.6 0.85", style="rounded"];
+	7[label = "filter_psl_to_bed", color = "0.12 0.6 0.85", style="rounded,dashed"];
+	8[label = "make_id_table_no_diff_expr", color = "0.15 0.6 0.85", style="rounded,dashed"];
+	/*9[label = "main", color = "0.21 0.6 0.85", style="rounded"];*/
+	10[label = "make_linked_snps_beds", color = "0.58 0.6 0.85", style="rounded,dashed"];
+	11[label = "get_geno_r2_pos", color = "0.42 0.6 0.85", style="rounded,dashed"];
+	12[label = "make_snp_beds\nvcf_pop: NB", color = "0.36 0.6 0.85", style="rounded,dashed"];
+	13[label = "get_linked_snps", color = "0.61 0.6 0.85", style="rounded,dashed"];
+	14[label = "sort_genes_bed", color = "0.06 0.6 0.85", style="rounded,dashed"];
+	15[label = "snps_near_homologous_de\nsnp_source: linked", color = "0.03 0.6 0.85", style="rounded"];
+	16[label = "make_snp_beds\nvcf_pop: MS", color = "0.36 0.6 0.85", style="rounded,dashed"];
+	17[label = "get_geno_r2_pos", color = "0.42 0.6 0.85", style="rounded,dashed"];
+	18[label = "get_geno_r2_pos", color = "0.42 0.6 0.85", style="rounded,dashed"];
+	19[label = "sort_bed_files", color = "0.48 0.6 0.85", style="rounded,dashed"];
+	20[label = "make_linked_snps_beds", color = "0.58 0.6 0.85", style="rounded,dashed"];
+	21[label = "get_nearest_k_features", color = "0.09 0.6 0.85", style="rounded,dashed"];
+	22[label = "get_linked_snps", color = "0.61 0.6 0.85", style="rounded,dashed"];
+	23[label = "snps_near_homologous_de\nsnp_source: original", color = "0.03 0.6 0.85", style="rounded"];
+	24[label = "get_linked_snps", color = "0.61 0.6 0.85", style="rounded,dashed"];
+	25[label = "subtract_gene_models", color = "0.39 0.6 0.85", style="rounded,dashed"];
+	26[label = "make_linked_snps_beds", color = "0.58 0.6 0.85", style="rounded,dashed"];
+	27[label = "make_snp_beds\nvcf_pop: OT", color = "0.36 0.6 0.85", style="rounded,dashed"];
+	28[label = "make_linked_snps_beds", color = "0.58 0.6 0.85", style="rounded,dashed"];
+	29[label = "run_blat", color = "0.52 0.6 0.85", style="rounded,dashed"];
+	30[label = "save_run_config", color = "0.45 0.6 0.85", style="rounded,dashed"];
+	18 -> 1
+	19 -> 3
+	16 -> 3
+	8 -> 6
+	29 -> 7
+	2 -> 7
+	/*0 -> 9
+	1 -> 9
+	10 -> 9
+	3 -> 9
+	6 -> 9
+	7 -> 9
+	8 -> 9
+	2 -> 9
+	11 -> 9
+	12 -> 9
+	27 -> 9
+	15 -> 9
+	16 -> 9
+	17 -> 9
+	18 -> 9
+	19 -> 9
+	20 -> 9
+	21 -> 9
+	22 -> 9
+	23 -> 9
+	24 -> 9
+	25 -> 9
+	26 -> 9
+	13 -> 9
+	28 -> 9
+	30 -> 9*/
+	22 -> 10
+	19 -> 11
+	12 -> 11
+	3 -> 13
+	5 -> 14
+	6 -> 15
+	21 -> 15
+	14 -> 15
+	19 -> 17
+	0 -> 17
+	19 -> 18
+	27 -> 18
+	0 -> 19
+	16 -> 19
+	25 -> 19
+	27 -> 19
+	12 -> 19
+	14 -> 19
+	13 -> 20
+	0 -> 21
+	27 -> 21
+	25 -> 21
+	16 -> 21
+	10 -> 21
+	19 -> 21
+	20 -> 21
+	28 -> 21
+	26 -> 21
+	12 -> 21
+	14 -> 21
+	11 -> 22
+	6 -> 23
+	21 -> 23
+	14 -> 23
+	17 -> 24
+	7 -> 25
+	14 -> 25
+	1 -> 26
+	24 -> 28
+	4 -> 29
+}

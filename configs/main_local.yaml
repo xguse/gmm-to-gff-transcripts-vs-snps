@@ -76,7 +76,7 @@ MAKE_ID_TABLE_WITH_DIFF_EXPR:
 
 # ---------------- MAIN ----------------------
 SNPS_NEAR_HOMOLOGOUS_DE:
-    SNP_DISTANCE_FROM_GENE: 0
+    SNP_DISTANCE_FROM_GENE: 200
     DE_TABLE_CHUNKSIZE: 1000
     RUN_PARALLEL: "yes"
     GENOME_BROWSER_URL: https://www.vectorbase.org/Glossina_fuscipes/Location/View?r=[chrom]:[left]-[right]

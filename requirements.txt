@@ -5,6 +5,10 @@
 python>=3.5
 graphviz>=2.38.0
 snakemake==3.7.1
+jupyter
+jupyter_nbextensions_configurator
+widgetsnbextension
+pandoc
 click
 Sphinx
 coverage
@@ -15,7 +19,6 @@ munch
 pip
 
 # Packages specific to your pipeline
-jupyter
 ipython
 seaborn
 pandas
