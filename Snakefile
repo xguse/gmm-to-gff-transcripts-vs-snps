@@ -98,7 +98,8 @@ SNP_SOURCES = ['original','linked']
 
 # collect meta-target 'inputs'
 PREP = []
-MAIN = []
+PREP_SNPS = []
+ANALYZE_SNPS = []
 DEBUG = []
 
 
@@ -119,7 +120,7 @@ rule save_run_config:
             cnf_out.write(ORIGINAL_CONFIG_AS_STRING)
 
 PREP.append(rules.save_run_config.output)
-MAIN.append(rules.save_run_config.output)
+PREP_SNPS.append(rules.save_run_config.output)
 
 
 # ------------ prep ------------- #
@@ -251,7 +252,7 @@ rule annotations_via_fasta:
 
 
 
-MAIN.append(rules.annotations_via_fasta.output)
+PREP_SNPS.append(rules.annotations_via_fasta.output)
 
 # ------------ main ------------- #
 #### FILTER_PSL_TO_BED ####
@@ -284,9 +285,9 @@ rule filter_psl_to_bed:
 
 
 
-MAIN.append(FILTER_PSL_TO_BED.o.bed_from_psl)
-MAIN.append(FILTER_PSL_TO_BED.o.tx_length_vs_hits)
-MAIN.append(FILTER_PSL_TO_BED.o.filtered_tx_data)
+PREP_SNPS.append(FILTER_PSL_TO_BED.o.bed_from_psl)
+PREP_SNPS.append(FILTER_PSL_TO_BED.o.tx_length_vs_hits)
+PREP_SNPS.append(FILTER_PSL_TO_BED.o.filtered_tx_data)
 
 # ------------ main ------------- #
 #### SUBTRACT_GENE_MODELS ####
@@ -308,7 +309,7 @@ rule subtract_gene_models:
     script:
         "python/scripts/subtract_gene_models.py"
 
-MAIN.append(SUBTRACT_GENE_MODELS.o.gene_model_subtracted)
+PREP_SNPS.append(SUBTRACT_GENE_MODELS.o.gene_model_subtracted)
 
 
 # ------------ main ------------- #
@@ -341,12 +342,13 @@ rule make_snp_beds:
     script:
         "python/scripts/make_snp_beds.py"
 
-MAIN.append(MAKE_SNP_BEDS.o.snp_beds_expanded)
+PREP_SNPS.append(MAKE_SNP_BEDS.o.snp_beds_expanded)
 
 # ------------ main ------------- #
 #### SORT_BED_FILES ####
 SORT_BED_FILES = MyRule(run=RUN, name="SORT_BED_FILES")
 
+SORT_BED_FILES.o.sorted_status = str(SORT_BED_FILES.out_dir / "sorted_status")
 # ---
 rule sort_bed_files:
     input:
@@ -355,7 +357,7 @@ rule sort_bed_files:
         gene_models_bed=SORT_GENES_BED.o.bed_sorted
 
     output:
-        sorted_status=str(SORT_BED_FILES.out_dir / "sorted_status")
+        sorted_status=SORT_BED_FILES.o.sorted_status
 
     shell:
         "for i in {input}; "
@@ -365,164 +367,9 @@ rule sort_bed_files:
         "done; "
         "touch {output}"
 
-MAIN.append(rules.sort_bed_files.output)
-
-# ------------ main ------------- #
-#### GET_NEAREST_K_FEATURES ####
-GET_NEAREST_K_FEATURES = MyRule(run=RUN, name="GET_NEAREST_K_FEATURES")
-#GET_NEAREST_K_FEATURES = config["GET_NEAREST_K_FEATURES"]
-
-# inputs
-# GET_NEAREST_K_FEATURES.i.snp_beds_rule_out_values = ['make_snp_beds','get_linked_snps']
-# GET_NEAREST_K_FEATURES.i.snp_beds_wldcd = str(RUN.out_dir / "{rule_out}/{bed}.bed")
-# GET_NEAREST_K_FEATURES.i.snp_beds_expanded = expand(GET_NEAREST_K_FEATURES.i.snp_beds_wldcd,
-#                                                     rule_out=GET_NEAREST_K_FEATURES.i.snp_beds_rule_out_values)
-
-# pprint(GET_NEAREST_K_FEATURES.i.snp_beds_expanded)
-
-# outputs
-GET_NEAREST_K_FEATURES.o.nearest_features_bed_wldcd = str(GET_NEAREST_K_FEATURES.out_dir / "{vcf_pop}.{kind}.nearest.bed")
-GET_NEAREST_K_FEATURES.o.nearest_features_bed_expanded = expand(GET_NEAREST_K_FEATURES.o.nearest_features_bed_wldcd, vcf_pop=VCF_POPS, kind=SNP_SOURCES)
-GET_NEAREST_K_FEATURES.o.snps_in_features_wldcd = str(GET_NEAREST_K_FEATURES.out_dir / "{vcf_pop}.{kind}.snps_in_features.xls")
-GET_NEAREST_K_FEATURES.o.snps_in_features_expanded = expand(GET_NEAREST_K_FEATURES.o.snps_in_features_wldcd, vcf_pop=VCF_POPS, kind=SNP_SOURCES)
+PREP_SNPS.append(SORT_BED_FILES.o.sorted_status)
 
 
-# ---
-rule get_nearest_k_features:
-    params:
-        k_number=GET_NEAREST_K_FEATURES.PARAMS.K
-    input:
-        snp_beds=[str(path) for path in list(RUN.out_dir.glob('**/*.linked.bed'))+list(RUN.out_dir.glob('**/*.original.bed'))],
-        gene_model_subtracted=SUBTRACT_GENE_MODELS.o.gene_model_subtracted,
-        gene_models=SORT_GENES_BED.o.bed_sorted
-
-    output:
-        nearest_features_beds=GET_NEAREST_K_FEATURES.o.nearest_features_bed_expanded,
-        snps_in_features=GET_NEAREST_K_FEATURES.o.snps_in_features_expanded,
-
-    script:
-        "python/scripts/get_nearest_k_features.py"
-
-# DEBUG.append(GET_NEAREST_K_FEATURES.o.nearest_features_bed_expanded)
-# DEBUG.append(GET_NEAREST_K_FEATURES.o.snps_in_features_expanded)
-
-MAIN.append(GET_NEAREST_K_FEATURES.o.nearest_features_bed_expanded)
-MAIN.append(GET_NEAREST_K_FEATURES.o.snps_in_features_expanded)
-
-# ------------ main ------------- #
-#### MAKE_ID_TABLE_NO_DIFF_EXPR ####
-MAKE_ID_TABLE_NO_DIFF_EXPR = MyRule(run=RUN, name="MAKE_ID_TABLE_NO_DIFF_EXPR")
-#MAKE_ID_TABLE_NO_DIFF_EXPR = config["MAKE_ID_TABLE_NO_DIFF_EXPR"]
-
-CUFFCMP_TRACKING = MAKE_ID_TABLE_NO_DIFF_EXPR.CUFFCMP_TRACKING
-ORTHOLOG_TABLE = ANNOTATIONS_VIA_FASTA.ORTHOLOG_TABLE
-
-MAKE_ID_TABLE_NO_DIFF_EXPR_OUT = str(MAKE_ID_TABLE_NO_DIFF_EXPR.out_dir)
-IDS_NO_DIFF_EXPR = MAKE_ID_TABLE_NO_DIFF_EXPR_OUT+'/ids_no_diff_expr.csv'
-
-# ---
-rule make_id_table_no_diff_expr:
-    input:
-        cuffcmp_tracking=CUFFCMP_TRACKING,
-        ortholog_table=ORTHOLOG_TABLE,
-
-    output:
-        ids_no_diff_expr=IDS_NO_DIFF_EXPR,
-
-    script:
-        "python/scripts/make_id_table_no_diff_expr.py"
-
-
-
-MAIN.append(rules.make_id_table_no_diff_expr.output)
-
-# ------------ main ------------- #
-#### MAKE_ID_TABLE_WITH_DIFF_EXPR ####
-MAKE_ID_TABLE_WITH_DIFF_EXPR = MyRule(run=RUN, name="MAKE_ID_TABLE_WITH_DIFF_EXPR")
-#MAKE_ID_TABLE_WITH_DIFF_EXPR = config["MAKE_ID_TABLE_WITH_DIFF_EXPR"]
-
-IDS_NO_DIFF_EXPR = IDS_NO_DIFF_EXPR
-
-EDGER_RESULTS_LABELS = list(MAKE_ID_TABLE_WITH_DIFF_EXPR.EDGER_RESULTS_INFO.keys())
-CUFFLINKS_RESULTS_LABELS = list(MAKE_ID_TABLE_WITH_DIFF_EXPR.CUFFLINKS_RESULTS_INFO.keys())
-
-EDGER_RESULTS = [MAKE_ID_TABLE_WITH_DIFF_EXPR.EDGER_RESULTS_INFO[label] for label in EDGER_RESULTS_LABELS]
-CUFFLINKS_RESULTS = [MAKE_ID_TABLE_WITH_DIFF_EXPR.CUFFLINKS_RESULTS_INFO[label] for label in CUFFLINKS_RESULTS_LABELS]
-
-MAKE_ID_TABLE_WITH_DIFF_EXPR_OUT = str(MAKE_ID_TABLE_WITH_DIFF_EXPR.out_dir)
-IDS_WITH_DIFF_EXPR = MAKE_ID_TABLE_WITH_DIFF_EXPR_OUT+'/ids_with_diff_expr.csv'
-
-
-
-# ---
-rule make_id_table_with_diff_expr:
-    params:
-        edger_results_labels=EDGER_RESULTS_LABELS,
-        cufflinks_results_labels=CUFFLINKS_RESULTS_LABELS,
-    input:
-        edger_results=EDGER_RESULTS,
-        cufflinks_results=CUFFLINKS_RESULTS,
-        ids_no_diff_expr=IDS_NO_DIFF_EXPR,
-
-    output:
-        ids_with_diff_expr=IDS_WITH_DIFF_EXPR,
-
-    script:
-        "python/scripts/make_id_table_with_diff_expr.py"
-
-
-
-MAIN.append(rules.make_id_table_with_diff_expr.output)
-
-# ------------ main ------------- #
-#### SNPS_NEAR_HOMOLOGOUS_DE ####
-SNPS_NEAR_HOMOLOGOUS_DE = MyRule(run=RUN, name="SNPS_NEAR_HOMOLOGOUS_DE")
-#SNPS_NEAR_HOMOLOGOUS_DE = config["SNPS_NEAR_HOMOLOGOUS_DE"]
-
-# params
-SNP_DISTANCE_FROM_GENE = SNPS_NEAR_HOMOLOGOUS_DE.SNP_DISTANCE_FROM_GENE
-DE_TABLE_CHUNKSIZE = SNPS_NEAR_HOMOLOGOUS_DE.DE_TABLE_CHUNKSIZE
-RUN_PARALLEL = SNPS_NEAR_HOMOLOGOUS_DE.RUN_PARALLEL
-GENOME_BROWSER_URL = SNPS_NEAR_HOMOLOGOUS_DE.GENOME_BROWSER_URL
-
-
-# input
-IDS_WITH_DIFF_EXPR = IDS_WITH_DIFF_EXPR
-
-# output
-SNPS_NEAR_HOMOLOGOUS_DE_PATH_WLDCD = str(SNPS_NEAR_HOMOLOGOUS_DE.out_dir / 'snps_near_homologous_de_distance_{distance}.{snp_source}.csv')
-SNPS_NEAR_HOMOLOGOUS_DE_PATH_EXPANDED = expand(SNPS_NEAR_HOMOLOGOUS_DE_PATH_WLDCD, distance=[SNP_DISTANCE_FROM_GENE], snp_source=SNP_SOURCES)
-
-
-# ---
-rule snps_near_homologous_de:
-    params:
-        snp_distance_from_gene=SNP_DISTANCE_FROM_GENE,
-        de_table_chunksize=DE_TABLE_CHUNKSIZE,
-        run_parallel=RUN_PARALLEL,
-        genome_browser_url=GENOME_BROWSER_URL,
-
-    input:
-        nearest_features_beds=GET_NEAREST_K_FEATURES.o.nearest_features_bed_expanded,
-        ids_with_diff_expr=IDS_WITH_DIFF_EXPR,
-        gene_models_bed=SORT_GENES_BED.o.bed_sorted,
-
-    output:
-        snps_near_homologous_de_path=SNPS_NEAR_HOMOLOGOUS_DE_PATH_WLDCD,
-
-    shell:
-        """python python/scripts/snps_near_homologous_de.py \
-        {input.nearest_features_beds} \
-        {input.ids_with_diff_expr} \
-        {output.snps_near_homologous_de_path} \
-        --distance {params.snp_distance_from_gene} \
-        --chunksize {params.de_table_chunksize} \
-        --parallel {params.run_parallel} \
-        --url '{params.genome_browser_url}' \
-        --bed {input.gene_models_bed} \
-        """
-
-MAIN.append(SNPS_NEAR_HOMOLOGOUS_DE_PATH_EXPANDED)
 
 # ------------------------- #
 #### GET_GENO_R2_POS ####
@@ -542,6 +389,7 @@ rule get_geno_r2_pos:
 
     input:
         snp_bed=GET_GENO_R2_POS.i.snp_bed,
+        sorted_sentinel=SORT_BED_FILES.o.sorted_status
 
     output:
         GET_GENO_R2_POS.o.snp_pos_wldcd,
@@ -550,7 +398,7 @@ rule get_geno_r2_pos:
         "cut -d$'\t' -f1,3 {input.snp_bed} > {output}"
         # "&> {log.path}"
 
-MAIN.append(GET_GENO_R2_POS.o.snp_pos_expanded)
+PREP_SNPS.append(GET_GENO_R2_POS.o.snp_pos_expanded)
 
 # ------------------------- #
 #### GET_LINKED_SNPS ####
@@ -599,9 +447,7 @@ rule get_linked_snps:
         "&> {log.path}"
 
 # DEBUG.append(GET_LINKED_SNPS.o.linked_snps_expanded)
-MAIN.append(GET_LINKED_SNPS.o.linked_snps_expanded)
-
-
+PREP_SNPS.append(GET_LINKED_SNPS.o.linked_snps_expanded)
 
 # ------------------------- #
 #### MAKE_LINKED_SNPS_BEDS ####
@@ -629,7 +475,172 @@ rule make_linked_snps_beds:
         "python/scripts/make_linked_snps_beds.py"
 
 DEBUG.append(MAKE_LINKED_SNPS_BEDS.o.bed_expanded)
-MAIN.append(MAKE_LINKED_SNPS_BEDS.o.bed_expanded)
+PREP_SNPS.append(MAKE_LINKED_SNPS_BEDS.o.bed_expanded)
+
+
+# ------------ main ------------- #
+#### MAKE_ID_TABLE_NO_DIFF_EXPR ####
+MAKE_ID_TABLE_NO_DIFF_EXPR = MyRule(run=RUN, name="MAKE_ID_TABLE_NO_DIFF_EXPR")
+#MAKE_ID_TABLE_NO_DIFF_EXPR = config["MAKE_ID_TABLE_NO_DIFF_EXPR"]
+
+CUFFCMP_TRACKING = MAKE_ID_TABLE_NO_DIFF_EXPR.CUFFCMP_TRACKING
+ORTHOLOG_TABLE = ANNOTATIONS_VIA_FASTA.ORTHOLOG_TABLE
+
+MAKE_ID_TABLE_NO_DIFF_EXPR_OUT = str(MAKE_ID_TABLE_NO_DIFF_EXPR.out_dir)
+IDS_NO_DIFF_EXPR = MAKE_ID_TABLE_NO_DIFF_EXPR_OUT+'/ids_no_diff_expr.csv'
+
+# ---
+rule make_id_table_no_diff_expr:
+    input:
+        cuffcmp_tracking=CUFFCMP_TRACKING,
+        ortholog_table=ORTHOLOG_TABLE,
+
+    output:
+        ids_no_diff_expr=IDS_NO_DIFF_EXPR,
+
+    script:
+        "python/scripts/make_id_table_no_diff_expr.py"
+
+
+
+ANALYZE_SNPS.append(rules.make_id_table_no_diff_expr.output)
+
+# ------------ main ------------- #
+#### MAKE_ID_TABLE_WITH_DIFF_EXPR ####
+MAKE_ID_TABLE_WITH_DIFF_EXPR = MyRule(run=RUN, name="MAKE_ID_TABLE_WITH_DIFF_EXPR")
+#MAKE_ID_TABLE_WITH_DIFF_EXPR = config["MAKE_ID_TABLE_WITH_DIFF_EXPR"]
+
+IDS_NO_DIFF_EXPR = IDS_NO_DIFF_EXPR
+
+EDGER_RESULTS_LABELS = list(MAKE_ID_TABLE_WITH_DIFF_EXPR.EDGER_RESULTS_INFO.keys())
+CUFFLINKS_RESULTS_LABELS = list(MAKE_ID_TABLE_WITH_DIFF_EXPR.CUFFLINKS_RESULTS_INFO.keys())
+
+EDGER_RESULTS = [MAKE_ID_TABLE_WITH_DIFF_EXPR.EDGER_RESULTS_INFO[label] for label in EDGER_RESULTS_LABELS]
+CUFFLINKS_RESULTS = [MAKE_ID_TABLE_WITH_DIFF_EXPR.CUFFLINKS_RESULTS_INFO[label] for label in CUFFLINKS_RESULTS_LABELS]
+
+MAKE_ID_TABLE_WITH_DIFF_EXPR_OUT = str(MAKE_ID_TABLE_WITH_DIFF_EXPR.out_dir)
+IDS_WITH_DIFF_EXPR = MAKE_ID_TABLE_WITH_DIFF_EXPR_OUT+'/ids_with_diff_expr.csv'
+
+
+
+# ---
+rule make_id_table_with_diff_expr:
+    params:
+        edger_results_labels=EDGER_RESULTS_LABELS,
+        cufflinks_results_labels=CUFFLINKS_RESULTS_LABELS,
+    input:
+        edger_results=EDGER_RESULTS,
+        cufflinks_results=CUFFLINKS_RESULTS,
+        ids_no_diff_expr=IDS_NO_DIFF_EXPR,
+
+    output:
+        ids_with_diff_expr=IDS_WITH_DIFF_EXPR,
+
+    script:
+        "python/scripts/make_id_table_with_diff_expr.py"
+
+
+
+ANALYZE_SNPS.append(rules.make_id_table_with_diff_expr.output)
+
+
+
+
+# ------------ main ------------- #
+#### GET_NEAREST_K_FEATURES ####
+GET_NEAREST_K_FEATURES = MyRule(run=RUN, name="GET_NEAREST_K_FEATURES")
+
+
+# outputs
+GET_NEAREST_K_FEATURES.o.nearest_features_bed_wldcd = str(GET_NEAREST_K_FEATURES.out_dir / "{vcf_pop}.{snp_source}.nearest.bed")
+GET_NEAREST_K_FEATURES.o.nearest_features_bed_expanded = expand(GET_NEAREST_K_FEATURES.o.nearest_features_bed_wldcd, vcf_pop=VCF_POPS, snp_source=SNP_SOURCES)
+GET_NEAREST_K_FEATURES.o.snps_in_features_wldcd = str(GET_NEAREST_K_FEATURES.out_dir / "{vcf_pop}.{snp_source}.snps_in_features.xls")
+GET_NEAREST_K_FEATURES.o.snps_in_features_expanded = expand(GET_NEAREST_K_FEATURES.o.snps_in_features_wldcd, vcf_pop=VCF_POPS, snp_source=SNP_SOURCES)
+
+
+# ---
+rule get_nearest_k_features:
+    params:
+        k_number=GET_NEAREST_K_FEATURES.PARAMS.K
+    input:
+        snp_beds=[str(path) for path in list(RUN.out_dir.glob('**/*.linked.bed'))+list(RUN.out_dir.glob('**/*.original.bed'))],
+        gene_model_subtracted=SUBTRACT_GENE_MODELS.o.gene_model_subtracted,
+        gene_models=SORT_GENES_BED.o.bed_sorted,
+        sorted_sentinel=SORT_BED_FILES.o.sorted_status,
+        linked_snp_beds=MAKE_LINKED_SNPS_BEDS.o.bed_expanded,
+
+    output:
+        nearest_features_beds=GET_NEAREST_K_FEATURES.o.nearest_features_bed_expanded,
+        snps_in_features=GET_NEAREST_K_FEATURES.o.snps_in_features_expanded,
+
+    script:
+        "python/scripts/get_nearest_k_features.py"
+
+ANALYZE_SNPS.append(GET_NEAREST_K_FEATURES.o.nearest_features_bed_expanded)
+ANALYZE_SNPS.append(GET_NEAREST_K_FEATURES.o.snps_in_features_expanded)
+
+# DEBUG.append(GET_NEAREST_K_FEATURES.o.nearest_features_bed_expanded)
+# DEBUG.append(GET_NEAREST_K_FEATURES.o.snps_in_features_expanded)
+
+
+# ------------ main ------------- #
+#### SNPS_NEAR_HOMOLOGOUS_DE ####
+SNPS_NEAR_HOMOLOGOUS_DE = MyRule(run=RUN, name="SNPS_NEAR_HOMOLOGOUS_DE")
+#SNPS_NEAR_HOMOLOGOUS_DE = config["SNPS_NEAR_HOMOLOGOUS_DE"]
+
+# params
+SNPS_NEAR_HOMOLOGOUS_DE.p.snp_distance_from_gene = SNPS_NEAR_HOMOLOGOUS_DE.SNP_DISTANCE_FROM_GENE
+SNPS_NEAR_HOMOLOGOUS_DE.p.de_table_chunksize = SNPS_NEAR_HOMOLOGOUS_DE.DE_TABLE_CHUNKSIZE
+SNPS_NEAR_HOMOLOGOUS_DE.p.run_parallel = SNPS_NEAR_HOMOLOGOUS_DE.RUN_PARALLEL
+SNPS_NEAR_HOMOLOGOUS_DE.p.genome_browser_url = SNPS_NEAR_HOMOLOGOUS_DE.GENOME_BROWSER_URL
+
+# input
+## set vcf_pop manually but leave kind as wildcard
+nearest_features_bed_wldcd_mod_template = GET_NEAREST_K_FEATURES.o.nearest_features_bed_wldcd.replace('{snp_source}','{{snp_source}}')
+
+SNPS_NEAR_HOMOLOGOUS_DE.i.nearest_features_bed_list_wldcds = [nearest_features_bed_wldcd_mod_template.format(vcf_pop=pop) for pop in VCF_POPS]
+
+# output
+SNPS_NEAR_HOMOLOGOUS_DE.o.snps_near_homologous_de_path_wldcd = str(SNPS_NEAR_HOMOLOGOUS_DE.out_dir / 'snps_near_homologous_de_distance_{distance}.{{snp_source}}.csv'.format(distance=SNPS_NEAR_HOMOLOGOUS_DE.p.snp_distance_from_gene))
+
+SNPS_NEAR_HOMOLOGOUS_DE.o.snps_near_homologous_de_path_expanded = expand(SNPS_NEAR_HOMOLOGOUS_DE.o.snps_near_homologous_de_path_wldcd,
+                                                                         snp_source=SNP_SOURCES)
+
+# ---
+rule snps_near_homologous_de:
+    params:
+        snp_distance_from_gene=SNPS_NEAR_HOMOLOGOUS_DE.p.snp_distance_from_gene,
+        de_table_chunksize=SNPS_NEAR_HOMOLOGOUS_DE.p.de_table_chunksize,
+        run_parallel=SNPS_NEAR_HOMOLOGOUS_DE.p.run_parallel,
+        genome_browser_url=SNPS_NEAR_HOMOLOGOUS_DE.p.genome_browser_url,
+
+    input:
+        nearest_features_beds=SNPS_NEAR_HOMOLOGOUS_DE.i.nearest_features_bed_list_wldcds,
+        ids_with_diff_expr=IDS_WITH_DIFF_EXPR,
+        gene_models_bed=SORT_GENES_BED.o.bed_sorted,
+
+    output:
+        snps_near_homologous_de_path=SNPS_NEAR_HOMOLOGOUS_DE.o.snps_near_homologous_de_path_wldcd,
+
+    shell:
+        """python python/scripts/snps_near_homologous_de.py \
+        {input.nearest_features_beds} \
+        {input.ids_with_diff_expr} \
+        {output.snps_near_homologous_de_path} \
+        --distance {params.snp_distance_from_gene} \
+        --chunksize {params.de_table_chunksize} \
+        --parallel {params.run_parallel} \
+        --url '{params.genome_browser_url}' \
+        --bed {input.gene_models_bed} \
+        """
+
+ANALYZE_SNPS.append(SNPS_NEAR_HOMOLOGOUS_DE.o.snps_near_homologous_de_path_expanded)
+
+
+
+
+
+
 
 
 
@@ -648,18 +659,17 @@ rule prep:
     input:
         PREP
 
-#### MAIN ####
+#### PREP_SNPS ####
 # ---
-rule main:
+rule prep_snps:
     input:
-        MAIN
+        PREP_SNPS
 
-#### ALL ####
+#### ANALYZE_SNPS ####
 # ---
-rule all:
+rule analyze_snps:
     input:
-        MAIN,
-        PREP
+        ANALYZE_SNPS
 
 
 #### PUT_PSL ####
